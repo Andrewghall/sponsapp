@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Mic, List, MapPin, Plus, FileSpreadsheet } from 'lucide-react'
@@ -11,8 +12,9 @@ export default function ProjectPage() {
   const projectId = params.id as string
   const { setCurrentProject, currentZoneId, setCurrentZone } = useAppStore()
 
-  // Set current project in store
-  setCurrentProject(projectId)
+  useEffect(() => {
+    setCurrentProject(projectId)
+  }, [projectId, setCurrentProject])
 
   return (
     <div className="min-h-screen bg-gray-50">
