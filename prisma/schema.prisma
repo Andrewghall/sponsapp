@@ -1,0 +1,268 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+}
+
+// ===========================================
+// CORE ENTITIES
+// ===========================================
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  client      String?
+  siteAddress String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  zones       Zone[]
+  lineItems   LineItem[]
+  exports     Export[]
+}
+
+model Zone {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  floor     String?
+  createdAt DateTime @default(now())
+  
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lineItems LineItem[]
+}
+
+// ===========================================
+// LINE ITEM - Maps 1:1 to LCY spreadsheet
+// ===========================================
+
+model LineItem {
+  id        String   @id @default(cuid())
+  projectId String
+  zoneId    String?
+  
+  status    LineItemStatus @default(PENDING_PASS1)
+  
+  // LCY3 Columns B-AC (exact mapping)
+  colB_type                    String?
+  colC_category                String?
+  colD_parent                  String?
+  colE_object                  String?
+  colF_equipmentConfiguration  String?
+  colG_description             String?
+  colH_equipmentPresent        String?
+  colI_prefilledDataCorrect    String?
+  colJ_commissioningDate       DateTime?
+  colK_manufacturer            String?
+  colL_model                   String?
+  colM_serialNumber            String?
+  colN_newManufacturer         String?
+  colO_assetAlias              String?
+  colP_refrigerantType         String?
+  colQ_refrigerantQty          Float?
+  colR_newApmLabelRequired     String?
+  colS_floor                   String?
+  colT_location                String?
+  colU_assetCondition          AssetCondition?
+  colV_assetSize               String?
+  colW_cibseGuidelines         String?
+  colX_sponsCostExclVat        Float?
+  colY_observations            String?
+  colZ_criticalSpares          String?
+  colAA_costOfChangeJayserv    Float?
+  colAB_pictureTaken           String?
+  colAC_riskProfile            String?
+  
+  // LCY2 additional columns
+  colP_property                String?
+  colQ_amazonMaintenance       String?
+  
+  // Audit (MANDATORY)
+  rawTranscript       String?
+  transcriptTimestamp DateTime?
+  unitConversionLogic String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  zone          Zone?            @relation(fields: [zoneId], references: [id])
+  captures      Capture[]
+  sponsMatches  SponsMatch[]
+  auditEntries  AuditEntry[]
+}
+
+enum LineItemStatus {
+  PENDING_PASS1
+  PASS1_COMPLETE
+  PENDING_PASS2
+  PASS2_COMPLETE
+  PENDING_SPONS
+  UNMATCHED
+  PENDING_QS_REVIEW
+  APPROVED
+  EXPORTED
+}
+
+enum AssetCondition {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ===========================================
+// CAPTURE - Audio & transcription
+// ===========================================
+
+model Capture {
+  id         String   @id @default(cuid())
+  lineItemId String
+  
+  audioUrl       String?
+  audioDuration  Float?
+  audioLocalKey  String?
+  
+  transcript     String?
+  transcribedAt  DateTime?
+  deepgramJobId  String?
+  
+  rawQuantities  Json?
+  rawComponents  Json?
+  
+  isOffline      Boolean   @default(false)
+  syncedAt       DateTime?
+  idempotencyKey String    @unique @default(cuid())
+  
+  createdAt DateTime @default(now())
+  
+  lineItem LineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+}
+
+// ===========================================
+// SPONS MATCHING - Retrieval only
+// ===========================================
+
+model SponsItem {
+  id          String  @id @default(cuid())
+  itemCode    String  @unique
+  book        String?
+  section     String?
+  description String
+  unit        String
+  trade       String?
+  rate        Float?
+  tags        String[]
+  
+  embedding   Unsupported("vector(1536)")?
+  
+  matches SponsMatch[]
+}
+
+model SponsMatch {
+  id         String   @id @default(cuid())
+  lineItemId String
+  sponsItemId String
+  
+  similarityScore Float?
+  isSelected      Boolean  @default(false)
+  selectedBy      String?
+  selectedAt      DateTime?
+  
+  unitMatches     Boolean  @default(false)
+  tradeMatches    Boolean  @default(false)
+  actionMatches   Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  
+  lineItem  LineItem  @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+  sponsItem SponsItem @relation(fields: [sponsItemId], references: [id])
+  
+  @@unique([lineItemId, sponsItemId])
+}
+
+// ===========================================
+// AUDIT TRAIL - Mandatory per spec
+// ===========================================
+
+model AuditEntry {
+  id         String   @id @default(cuid())
+  lineItemId String
+  
+  action      AuditAction
+  timestamp   DateTime    @default(now())
+  userId      String?
+  
+  spokenSentence        String?
+  unitConversionLogic   String?
+  sponsCandidatesJson   Json?
+  finalSelectionId      String?
+  approvalStatus        String?
+  
+  metadata    Json?
+  
+  lineItem LineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
+}
+
+enum AuditAction {
+  CREATED
+  TRANSCRIBED
+  PASS1_COMPLETE
+  PASS2_NORMALISED
+  SPONS_CANDIDATES_RETRIEVED
+  SPONS_SELECTED
+  QS_REVIEWED
+  APPROVED
+  EXPORTED
+  MODIFIED
+}
+
+// ===========================================
+// EXPORT
+// ===========================================
+
+model Export {
+  id        String   @id @default(cuid())
+  projectId String
+  
+  fileName    String
+  fileUrl     String?
+  format      ExportFormat
+  sheetType   SheetType
+  
+  rowCount    Int
+  exportedBy  String?
+  exportedAt  DateTime @default(now())
+  
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+enum ExportFormat {
+  EXCEL
+  PDF
+}
+
+enum SheetType {
+  LCY2
+  LCY3
+}
+
+// ===========================================
+// COLUMN MAPPING - For export validation
+// ===========================================
+
+model ColumnMapping {
+  id            String    @id @default(cuid())
+  sheetType     SheetType
+  columnLetter  String
+  headerText    String
+  internalField String
+  isMandatory   Boolean   @default(false)
+  
+  @@unique([sheetType, columnLetter])
+}

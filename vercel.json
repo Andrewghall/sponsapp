@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "regions": ["lhr1"],
+  "env": {
+    "NEXT_PUBLIC_ENVIRONMENT": "prelive"
+  }
+}
