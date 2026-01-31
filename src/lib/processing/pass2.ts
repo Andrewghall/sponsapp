@@ -137,6 +137,23 @@ export async function processPass2(lineItemId: string): Promise<Pass2Result> {
     }
   }
 
+  // If retrieval returned candidates, run agentic selection
+  if (candidates.length > 0) {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/spons/agent-select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineItemId }),
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        console.error('Agent selection failed:', err)
+      }
+    } catch (err) {
+      console.error('Failed to call agent selection:', err)
+    }
+  }
+
   return {
     lineItemId,
     normalised,
