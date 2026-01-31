@@ -37,15 +37,35 @@ export async function POST(request: NextRequest) {
 
     // Update capture with transcript
     if (captureId) {
-      await prisma.captures.update({
-        where: { id: captureId },
-        data: {
-          transcript: result.transcript,
-          transcribed_at: new Date(),
-          raw_quantities: extractQuantities(result.transcript),
-          raw_components: extractComponents(result.transcript),
-        },
-      })
+      const data = {
+        transcript: result.transcript,
+        transcribed_at: new Date(),
+        raw_quantities: extractQuantities(result.transcript),
+        raw_components: extractComponents(result.transcript),
+      }
+
+      const existing = await prisma.captures.findUnique({ where: { id: captureId } })
+      if (existing) {
+        await prisma.captures.update({
+          where: { id: captureId },
+          data,
+        })
+      } else {
+        if (!lineItemId) {
+          return NextResponse.json(
+            { error: 'captureId not found; lineItemId is required to create capture' },
+            { status: 400 }
+          )
+        }
+
+        await prisma.captures.create({
+          data: {
+            id: captureId,
+            line_item_id: lineItemId,
+            ...data,
+          },
+        })
+      }
     }
 
     // Update line item status to PASS1_COMPLETE
