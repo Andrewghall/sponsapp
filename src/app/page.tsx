@@ -4,15 +4,24 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
-export default async function Home() {
-  const projects = await prisma.projects.findMany({
-    orderBy: { updated_at: 'desc' },
-    include: {
-      _count: {
-        select: { line_items: true, zones: true },
+async function getProjects() {
+  try {
+    return await prisma.projects.findMany({
+      orderBy: { updated_at: 'desc' },
+      include: {
+        _count: {
+          select: { line_items: true, zones: true },
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    console.error('Failed to fetch projects:', error);
+    return [];
+  }
+}
+
+export default async function Home() {
+  const projects = await getProjects();
 
   return (
     <div className="p-4 pb-24">
