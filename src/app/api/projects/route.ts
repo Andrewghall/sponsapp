@@ -4,11 +4,11 @@ import { prisma } from '@/lib/prisma'
 // GET /api/projects - List all projects
 export async function GET() {
   try {
-    const projects = await prisma.project.findMany({
-      orderBy: { updatedAt: 'desc' },
+    const projects = await prisma.projects.findMany({
+      orderBy: { updated_at: 'desc' },
       include: {
         _count: {
-          select: { lineItems: true, zones: true },
+          select: { line_items: true, zones: true },
         },
       },
     })
@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const project = await prisma.project.create({
+    const project = await prisma.projects.create({
       data: {
         name,
         client,
-        siteAddress,
+        site_address: siteAddress,
       },
     })
 

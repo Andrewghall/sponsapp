@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get project and line items
-    const project = await prisma.project.findUnique({
+    const project = await prisma.projects.findUnique({
       where: { id: projectId },
     })
 
@@ -52,19 +52,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    const lineItems = await prisma.lineItem.findMany({
+    const lineItems = await prisma.line_items.findMany({
       where: {
-        projectId,
+        project_id: projectId,
         status: { in: ['APPROVED', 'EXPORTED'] },
       },
       include: {
-        sponsMatches: {
-          where: { isSelected: true },
-          include: { sponsItem: true },
+        spons_matches: {
+          where: { is_selected: true },
+          include: { spons_items: true },
         },
-        auditEntries: true,
+        audit_entries: true,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { created_at: 'asc' },
     })
 
     // Create workbook
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       })
 
       // Mark as exported
-      prisma.lineItem.update({
+      prisma.line_items.update({
         where: { id: item.id },
         data: { status: 'EXPORTED' },
       })
@@ -126,15 +126,15 @@ export async function POST(request: NextRequest) {
     ]
 
     lineItems.forEach((item) => {
-      item.auditEntries.forEach((entry) => {
+      item.audit_entries.forEach((entry) => {
         auditSheet.addRow({
           lineItemId: item.id,
-          spokenSentence: entry.spokenSentence,
-          timestamp: entry.timestamp.toISOString(),
-          unitConversion: entry.unitConversionLogic,
-          sponsCandidates: JSON.stringify(entry.sponsCandidatesJson),
-          finalSelection: entry.finalSelectionId,
-          approvalStatus: entry.approvalStatus,
+          spokenSentence: entry.spoken_sentence,
+          timestamp: entry.timestamp?.toISOString(),
+          unitConversion: entry.unit_conversion_logic,
+          sponsCandidates: JSON.stringify(entry.spons_candidates_json),
+          finalSelection: entry.final_selection_id,
+          approvalStatus: entry.approval_status,
         })
       })
     })
@@ -143,13 +143,13 @@ export async function POST(request: NextRequest) {
     const buffer = await workbook.xlsx.writeBuffer()
 
     // Create export record
-    const exportRecord = await prisma.export.create({
+    const exportRecord = await prisma.exports.create({
       data: {
-        projectId,
-        fileName: `${project.name}-${sheetType}-${new Date().toISOString().split('T')[0]}.xlsx`,
+        project_id: projectId,
+        file_name: `${project.name}-${sheetType}-${new Date().toISOString().split('T')[0]}.xlsx`,
         format: 'EXCEL',
-        sheetType: sheetType as 'LCY2' | 'LCY3',
-        rowCount: lineItems.length,
+        sheet_type: sheetType as 'LCY2' | 'LCY3',
+        row_count: lineItems.length,
       },
     })
 
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="${exportRecord.fileName}"`,
+        'Content-Disposition': `attachment; filename="${exportRecord.file_name}"`,
       },
     })
   } catch (error) {

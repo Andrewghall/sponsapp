@@ -38,11 +38,11 @@ export async function matchToSpons(
 ): Promise<MatchResult> {
   const { autoSelect = false, confidenceThreshold = 0.8 } = options || {}
 
-  const lineItem = await prisma.lineItem.findUnique({
+  const lineItem = await prisma.line_items.findUnique({
     where: { id: lineItemId },
     include: {
       captures: {
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
         take: 1,
       },
     },
@@ -54,19 +54,19 @@ export async function matchToSpons(
 
   // Get raw components and determine trade/unit requirements
   const capture = lineItem.captures[0]
-  const rawComponents = (capture?.rawComponents as string[]) || []
-  const rawQuantities = (capture?.rawQuantities as { value: number; unit: string }[]) || []
+  const rawComponents = (capture?.raw_components as string[]) || []
+  const rawQuantities = (capture?.raw_quantities as { value: number; unit: string }[]) || []
 
   // Determine expected unit from quantities
   const expectedUnit = rawQuantities[0]?.unit || 'nr'
   
   // Determine trade from type/category
-  const trade = determineTrade(lineItem.colB_type, lineItem.colC_category)
+  const trade = determineTrade(lineItem.col_b_type, lineItem.col_c_category)
 
   // Search for candidates - filter by trade and unit FIRST
   const searchTerms = [
-    lineItem.colG_description,
-    lineItem.colB_type,
+    lineItem.col_g_description,
+    lineItem.col_b_type,
     ...rawComponents,
   ].filter(Boolean).join(' ')
 
@@ -75,11 +75,11 @@ export async function matchToSpons(
   // Score and filter candidates
   const scoredCandidates: SponsCandidate[] = candidates.map(item => ({
     id: item.id,
-    itemCode: item.itemCode,
+    itemCode: item.item_code,
     description: item.description,
     unit: item.unit,
     trade: item.trade,
-    rate: item.rate,
+    rate: item.rate ? Number(item.rate) : null,
     similarityScore: calculateSimilarity(searchTerms, item.description),
     unitMatches: item.unit.toLowerCase() === expectedUnit.toLowerCase(),
     tradeMatches: !trade || item.trade?.toLowerCase() === trade.toLowerCase(),
@@ -95,32 +95,32 @@ export async function matchToSpons(
 
   // Store all candidates in database
   for (const candidate of compatibleCandidates) {
-    await prisma.sponsMatch.upsert({
+    await prisma.spons_matches.upsert({
       where: {
-        lineItemId_sponsItemId: {
-          lineItemId,
-          sponsItemId: candidate.id,
+        line_item_id_spons_item_id: {
+          line_item_id: lineItemId,
+          spons_item_id: candidate.id,
         },
       },
       create: {
-        lineItemId,
-        sponsItemId: candidate.id,
-        similarityScore: candidate.similarityScore,
-        unitMatches: candidate.unitMatches,
-        tradeMatches: candidate.tradeMatches,
+        line_item_id: lineItemId,
+        spons_item_id: candidate.id,
+        similarity_score: candidate.similarityScore,
+        unit_matches: candidate.unitMatches,
+        trade_matches: candidate.tradeMatches,
       },
       update: {
-        similarityScore: candidate.similarityScore,
+        similarity_score: candidate.similarityScore,
       },
     })
   }
 
   // Create audit entry for candidates retrieved
-  await prisma.auditEntry.create({
+  await prisma.audit_entries.create({
     data: {
-      lineItemId,
+      line_item_id: lineItemId,
       action: 'SPONS_CANDIDATES_RETRIEVED',
-      sponsCandidatesJson: compatibleCandidates.map(c => ({
+      spons_candidates_json: compatibleCandidates.map(c => ({
         id: c.id,
         itemCode: c.itemCode,
         similarity: c.similarityScore,
@@ -169,7 +169,7 @@ export async function matchToSpons(
   }
 
   // Update line item status
-  await prisma.lineItem.update({
+  await prisma.line_items.update({
     where: { id: lineItemId },
     data: {
       status: status === 'MATCHED' ? 'APPROVED' : 
@@ -193,50 +193,50 @@ export async function selectSponsMatch(
   selectedBy: string
 ): Promise<void> {
   // Deselect any existing selection
-  await prisma.sponsMatch.updateMany({
-    where: { lineItemId, isSelected: true },
-    data: { isSelected: false },
+  await prisma.spons_matches.updateMany({
+    where: { line_item_id: lineItemId, is_selected: true },
+    data: { is_selected: false },
   })
 
   // Select the new match
-  await prisma.sponsMatch.update({
+  await prisma.spons_matches.update({
     where: {
-      lineItemId_sponsItemId: {
-        lineItemId,
-        sponsItemId,
+      line_item_id_spons_item_id: {
+        line_item_id: lineItemId,
+        spons_item_id: sponsItemId,
       },
     },
     data: {
-      isSelected: true,
-      selectedBy,
-      selectedAt: new Date(),
+      is_selected: true,
+      selected_by: selectedBy,
+      selected_at: new Date(),
     },
   })
 
   // Get the SPONS item to update line item cost
-  const sponsItem = await prisma.sponsItem.findUnique({
+  const sponsItem = await prisma.spons_items.findUnique({
     where: { id: sponsItemId },
   })
 
   if (sponsItem) {
-    await prisma.lineItem.update({
+    await prisma.line_items.update({
       where: { id: lineItemId },
       data: {
-        colX_sponsCostExclVat: sponsItem.rate,
+        col_x_spons_cost_excl_vat: sponsItem.rate,
         status: 'APPROVED',
       },
     })
   }
 
   // Create audit entry
-  await prisma.auditEntry.create({
+  await prisma.audit_entries.create({
     data: {
-      lineItemId,
+      line_item_id: lineItemId,
       action: 'SPONS_SELECTED',
-      finalSelectionId: sponsItemId,
+      final_selection_id: sponsItemId,
       metadata: {
         selectedBy,
-        sponsCode: sponsItem?.itemCode,
+        sponsCode: sponsItem?.item_code,
       },
     },
   })
@@ -247,14 +247,7 @@ async function searchSponsItems(
   query: string,
   trade: string | null,
   unit: string
-): Promise<Array<{
-  id: string
-  itemCode: string
-  description: string
-  unit: string
-  trade: string | null
-  rate: number | null
-}>> {
+) {
   const where: Record<string, unknown> = {}
   
   // Filter by trade if specified
@@ -273,12 +266,12 @@ async function searchSponsItems(
     ]
   }
 
-  return prisma.sponsItem.findMany({
+  return prisma.spons_items.findMany({
     where,
     take: 20,
     select: {
       id: true,
-      itemCode: true,
+      item_code: true,
       description: true,
       unit: true,
       trade: true,

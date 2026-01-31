@@ -7,209 +7,204 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   directUrl  = env("DIRECT_URL")
-  extensions = [vector]
+  extensions = [uuid_ossp(map: "uuid-ossp", schema: "extensions"), vector]
 }
 
-// ===========================================
-// CORE ENTITIES
-// ===========================================
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model audit_entries {
+  id                    String       @id @default(dbgenerated("(gen_random_uuid())::text"))
+  line_item_id          String
+  action                audit_action
+  timestamp             DateTime?    @default(now()) @db.Timestamptz(6)
+  user_id               String?
+  spoken_sentence       String?
+  unit_conversion_logic String?
+  spons_candidates_json Json?
+  final_selection_id    String?
+  approval_status       String?
+  metadata              Json?
+  line_items            line_items   @relation(fields: [line_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-model Project {
-  id          String   @id @default(cuid())
-  name        String
-  client      String?
-  siteAddress String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  zones       Zone[]
-  lineItems   LineItem[]
-  exports     Export[]
+  @@index([action], map: "idx_audit_action")
+  @@index([line_item_id], map: "idx_audit_line_item")
 }
 
-model Zone {
-  id        String   @id @default(cuid())
-  projectId String
-  name      String
-  floor     String?
-  createdAt DateTime @default(now())
-  
-  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  lineItems LineItem[]
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model captures {
+  id              String     @id @default(dbgenerated("(gen_random_uuid())::text"))
+  line_item_id    String
+  audio_url       String?
+  audio_duration  Decimal?   @db.Decimal
+  audio_local_key String?
+  transcript      String?
+  transcribed_at  DateTime?  @db.Timestamptz(6)
+  deepgram_job_id String?
+  raw_quantities  Json?
+  raw_components  Json?
+  is_offline      Boolean?   @default(false)
+  synced_at       DateTime?  @db.Timestamptz(6)
+  idempotency_key String?    @unique @default(dbgenerated("(gen_random_uuid())::text"))
+  created_at      DateTime?  @default(now()) @db.Timestamptz(6)
+  line_items      line_items @relation(fields: [line_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([idempotency_key], map: "idx_captures_idempotency")
+  @@index([line_item_id], map: "idx_captures_line_item")
 }
 
-// ===========================================
-// LINE ITEM - Maps 1:1 to LCY spreadsheet
-// ===========================================
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model column_mappings {
+  id             String     @id @default(dbgenerated("(gen_random_uuid())::text"))
+  sheet_type     sheet_type
+  column_letter  String
+  header_text    String
+  internal_field String
+  is_mandatory   Boolean?   @default(false)
 
-model LineItem {
-  id        String   @id @default(cuid())
-  projectId String
-  zoneId    String?
-  
-  status    LineItemStatus @default(PENDING_PASS1)
-  
-  // LCY3 Columns B-AC (exact mapping)
-  colB_type                    String?
-  colC_category                String?
-  colD_parent                  String?
-  colE_object                  String?
-  colF_equipmentConfiguration  String?
-  colG_description             String?
-  colH_equipmentPresent        String?
-  colI_prefilledDataCorrect    String?
-  colJ_commissioningDate       DateTime?
-  colK_manufacturer            String?
-  colL_model                   String?
-  colM_serialNumber            String?
-  colN_newManufacturer         String?
-  colO_assetAlias              String?
-  colP_refrigerantType         String?
-  colQ_refrigerantQty          Float?
-  colR_newApmLabelRequired     String?
-  colS_floor                   String?
-  colT_location                String?
-  colU_assetCondition          AssetCondition?
-  colV_assetSize               String?
-  colW_cibseGuidelines         String?
-  colX_sponsCostExclVat        Float?
-  colY_observations            String?
-  colZ_criticalSpares          String?
-  colAA_costOfChangeJayserv    Float?
-  colAB_pictureTaken           String?
-  colAC_riskProfile            String?
-  
-  // LCY2 additional columns
-  colP_property                String?
-  colQ_amazonMaintenance       String?
-  
-  // Audit (MANDATORY)
-  rawTranscript       String?
-  transcriptTimestamp DateTime?
-  unitConversionLogic String?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  zone          Zone?            @relation(fields: [zoneId], references: [id])
-  captures      Capture[]
-  sponsMatches  SponsMatch[]
-  auditEntries  AuditEntry[]
+  @@unique([sheet_type, column_letter])
 }
 
-enum LineItemStatus {
-  PENDING_PASS1
-  PASS1_COMPLETE
-  PENDING_PASS2
-  PASS2_COMPLETE
-  PENDING_SPONS
-  UNMATCHED
-  PENDING_QS_REVIEW
-  APPROVED
-  EXPORTED
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model exports {
+  id          String        @id @default(dbgenerated("(gen_random_uuid())::text"))
+  project_id  String
+  file_name   String
+  file_url    String?
+  format      export_format
+  sheet_type  sheet_type
+  row_count   Int
+  exported_by String?
+  exported_at DateTime?     @default(now()) @db.Timestamptz(6)
+  projects    projects      @relation(fields: [project_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([project_id], map: "idx_exports_project")
 }
 
-enum AssetCondition {
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model line_items {
+  id                            String            @id @default(dbgenerated("(gen_random_uuid())::text"))
+  project_id                    String
+  zone_id                       String?
+  status                        line_item_status? @default(PENDING_PASS1)
+  col_b_type                    String?
+  col_c_category                String?
+  col_d_parent                  String?
+  col_e_object                  String?
+  col_f_equipment_configuration String?
+  col_g_description             String?
+  col_h_equipment_present       String?
+  col_i_prefilled_data_correct  String?
+  col_j_commissioning_date      DateTime?         @db.Timestamptz(6)
+  col_k_manufacturer            String?
+  col_l_model                   String?
+  col_m_serial_number           String?
+  col_n_new_manufacturer        String?
+  col_o_asset_alias             String?
+  col_p_refrigerant_type        String?
+  col_q_refrigerant_qty         Decimal?          @db.Decimal
+  col_r_new_apm_label_required  String?
+  col_s_floor                   String?
+  col_t_location                String?
+  col_u_asset_condition         asset_condition?
+  col_v_asset_size              String?
+  col_w_cibse_guidelines        String?
+  col_x_spons_cost_excl_vat     Decimal?          @db.Decimal
+  col_y_observations            String?
+  col_z_critical_spares         String?
+  col_aa_cost_of_change_jayserv Decimal?          @db.Decimal
+  col_ab_picture_taken          String?
+  col_ac_risk_profile           String?
+  col_p_property                String?
+  col_q_amazon_maintenance      String?
+  raw_transcript                String?
+  transcript_timestamp          DateTime?         @db.Timestamptz(6)
+  unit_conversion_logic         String?
+  created_at                    DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime?         @default(now()) @db.Timestamptz(6)
+  audit_entries                 audit_entries[]
+  captures                      captures[]
+  projects                      projects          @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  zones                         zones?            @relation(fields: [zone_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  spons_matches                 spons_matches[]
+
+  @@index([project_id], map: "idx_line_items_project")
+  @@index([status], map: "idx_line_items_status")
+  @@index([zone_id], map: "idx_line_items_zone")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model projects {
+  id           String       @id @default(dbgenerated("(gen_random_uuid())::text"))
+  name         String
+  client       String?
+  site_address String?
+  created_at   DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime?    @default(now()) @db.Timestamptz(6)
+  exports      exports[]
+  line_items   line_items[]
+  zones        zones[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model spons_items {
+  id            String                 @id @default(dbgenerated("(gen_random_uuid())::text"))
+  item_code     String                 @unique
+  book          String?
+  section       String?
+  description   String
+  unit          String
+  trade         String?
+  rate          Decimal?               @db.Decimal
+  tags          String[]
+  embedding     Unsupported("vector")?
+  created_at    DateTime?              @default(now()) @db.Timestamptz(6)
+  spons_matches spons_matches[]
+
+  @@index([item_code], map: "idx_spons_code")
+  @@index([embedding], map: "idx_spons_embedding")
+  @@index([trade], map: "idx_spons_trade")
+  @@index([unit], map: "idx_spons_unit")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model spons_matches {
+  id               String      @id @default(dbgenerated("(gen_random_uuid())::text"))
+  line_item_id     String
+  spons_item_id    String
+  similarity_score Decimal?    @db.Decimal
+  is_selected      Boolean?    @default(false)
+  selected_by      String?
+  selected_at      DateTime?   @db.Timestamptz(6)
+  unit_matches     Boolean?    @default(false)
+  trade_matches    Boolean?    @default(false)
+  action_matches   Boolean?    @default(false)
+  created_at       DateTime?   @default(now()) @db.Timestamptz(6)
+  line_items       line_items  @relation(fields: [line_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  spons_items      spons_items @relation(fields: [spons_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([line_item_id, spons_item_id])
+  @@index([line_item_id], map: "idx_spons_matches_line_item")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model zones {
+  id         String       @id @default(dbgenerated("(gen_random_uuid())::text"))
+  project_id String
+  name       String
+  floor      String?
+  created_at DateTime?    @default(now()) @db.Timestamptz(6)
+  line_items line_items[]
+  projects   projects     @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([project_id], map: "idx_zones_project")
+}
+
+enum asset_condition {
   LOW
   MEDIUM
   HIGH
 }
 
-// ===========================================
-// CAPTURE - Audio & transcription
-// ===========================================
-
-model Capture {
-  id         String   @id @default(cuid())
-  lineItemId String
-  
-  audioUrl       String?
-  audioDuration  Float?
-  audioLocalKey  String?
-  
-  transcript     String?
-  transcribedAt  DateTime?
-  deepgramJobId  String?
-  
-  rawQuantities  Json?
-  rawComponents  Json?
-  
-  isOffline      Boolean   @default(false)
-  syncedAt       DateTime?
-  idempotencyKey String    @unique @default(cuid())
-  
-  createdAt DateTime @default(now())
-  
-  lineItem LineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
-}
-
-// ===========================================
-// SPONS MATCHING - Retrieval only
-// ===========================================
-
-model SponsItem {
-  id          String  @id @default(cuid())
-  itemCode    String  @unique
-  book        String?
-  section     String?
-  description String
-  unit        String
-  trade       String?
-  rate        Float?
-  tags        String[]
-  
-  embedding   Unsupported("vector(1536)")?
-  
-  matches SponsMatch[]
-}
-
-model SponsMatch {
-  id         String   @id @default(cuid())
-  lineItemId String
-  sponsItemId String
-  
-  similarityScore Float?
-  isSelected      Boolean  @default(false)
-  selectedBy      String?
-  selectedAt      DateTime?
-  
-  unitMatches     Boolean  @default(false)
-  tradeMatches    Boolean  @default(false)
-  actionMatches   Boolean  @default(false)
-  
-  createdAt DateTime @default(now())
-  
-  lineItem  LineItem  @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
-  sponsItem SponsItem @relation(fields: [sponsItemId], references: [id])
-  
-  @@unique([lineItemId, sponsItemId])
-}
-
-// ===========================================
-// AUDIT TRAIL - Mandatory per spec
-// ===========================================
-
-model AuditEntry {
-  id         String   @id @default(cuid())
-  lineItemId String
-  
-  action      AuditAction
-  timestamp   DateTime    @default(now())
-  userId      String?
-  
-  spokenSentence        String?
-  unitConversionLogic   String?
-  sponsCandidatesJson   Json?
-  finalSelectionId      String?
-  approvalStatus        String?
-  
-  metadata    Json?
-  
-  lineItem LineItem @relation(fields: [lineItemId], references: [id], onDelete: Cascade)
-}
-
-enum AuditAction {
+enum audit_action {
   CREATED
   TRANSCRIBED
   PASS1_COMPLETE
@@ -222,47 +217,24 @@ enum AuditAction {
   MODIFIED
 }
 
-// ===========================================
-// EXPORT
-// ===========================================
-
-model Export {
-  id        String   @id @default(cuid())
-  projectId String
-  
-  fileName    String
-  fileUrl     String?
-  format      ExportFormat
-  sheetType   SheetType
-  
-  rowCount    Int
-  exportedBy  String?
-  exportedAt  DateTime @default(now())
-  
-  project Project @relation(fields: [projectId], references: [id])
-}
-
-enum ExportFormat {
+enum export_format {
   EXCEL
   PDF
 }
 
-enum SheetType {
-  LCY2
-  LCY3
+enum line_item_status {
+  PENDING_PASS1
+  PASS1_COMPLETE
+  PENDING_PASS2
+  PASS2_COMPLETE
+  PENDING_SPONS
+  UNMATCHED
+  PENDING_QS_REVIEW
+  APPROVED
+  EXPORTED
 }
 
-// ===========================================
-// COLUMN MAPPING - For export validation
-// ===========================================
-
-model ColumnMapping {
-  id            String    @id @default(cuid())
-  sheetType     SheetType
-  columnLetter  String
-  headerText    String
-  internalField String
-  isMandatory   Boolean   @default(false)
-  
-  @@unique([sheetType, columnLetter])
+enum sheet_type {
+  LCY2
+  LCY3
 }

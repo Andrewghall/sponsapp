@@ -12,9 +12,9 @@ export interface Pass1Result {
 
 // Process a capture through Pass 1
 export async function processPass1(captureId: string): Promise<Pass1Result> {
-  const capture = await prisma.capture.findUnique({
+  const capture = await prisma.captures.findUnique({
     where: { id: captureId },
-    include: { lineItem: true },
+    include: { line_items: true },
   })
 
   if (!capture || !capture.transcript) {
@@ -26,30 +26,30 @@ export async function processPass1(captureId: string): Promise<Pass1Result> {
   const rawComponents = extractComponents(transcript)
 
   // Update capture with extracted data
-  await prisma.capture.update({
+  await prisma.captures.update({
     where: { id: captureId },
     data: {
-      rawQuantities,
-      rawComponents,
+      raw_quantities: rawQuantities,
+      raw_components: rawComponents,
     },
   })
 
   // Update line item status
-  await prisma.lineItem.update({
-    where: { id: capture.lineItemId },
+  await prisma.line_items.update({
+    where: { id: capture.line_item_id },
     data: {
       status: 'PASS1_COMPLETE',
-      rawTranscript: transcript,
-      transcriptTimestamp: new Date(),
+      raw_transcript: transcript,
+      transcript_timestamp: new Date(),
     },
   })
 
   // Create audit entry
-  await prisma.auditEntry.create({
+  await prisma.audit_entries.create({
     data: {
-      lineItemId: capture.lineItemId,
+      line_item_id: capture.line_item_id,
       action: 'PASS1_COMPLETE',
-      spokenSentence: transcript,
+      spoken_sentence: transcript,
       metadata: {
         rawQuantities,
         rawComponents,

@@ -34,11 +34,11 @@ const MANDATORY_FIELDS = [
 
 // Process a line item through Pass 2
 export async function processPass2(lineItemId: string): Promise<Pass2Result> {
-  const lineItem = await prisma.lineItem.findUnique({
+  const lineItem = await prisma.line_items.findUnique({
     where: { id: lineItemId },
     include: {
       captures: {
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
         take: 1,
       },
     },
@@ -53,8 +53,8 @@ export async function processPass2(lineItemId: string): Promise<Pass2Result> {
     throw new Error('No capture found for line item')
   }
 
-  const rawComponents = (capture.rawComponents as string[]) || []
-  const rawQuantities = (capture.rawQuantities as { value: number; unit: string }[]) || []
+  const rawComponents = (capture.raw_components as string[]) || []
+  const rawQuantities = (capture.raw_quantities as { value: number; unit: string }[]) || []
   const transcript = capture.transcript || ''
 
   // Synonym resolution
@@ -94,27 +94,27 @@ export async function processPass2(lineItemId: string): Promise<Pass2Result> {
   const isValid = missingMandatory.length === 0
 
   // Update line item
-  await prisma.lineItem.update({
+  await prisma.line_items.update({
     where: { id: lineItemId },
     data: {
       status: isValid ? 'PASS2_COMPLETE' : 'PENDING_PASS2',
-      colB_type: normalised.type,
-      colC_category: normalised.category,
-      colG_description: normalised.description,
-      colS_floor: normalised.floor,
-      colT_location: normalised.location,
-      colU_assetCondition: normalised.assetCondition,
-      colY_observations: normalised.observations,
-      unitConversionLogic,
+      col_b_type: normalised.type,
+      col_c_category: normalised.category,
+      col_g_description: normalised.description,
+      col_s_floor: normalised.floor,
+      col_t_location: normalised.location,
+      col_u_asset_condition: normalised.assetCondition,
+      col_y_observations: normalised.observations,
+      unit_conversion_logic: unitConversionLogic,
     },
   })
 
   // Create audit entry
-  await prisma.auditEntry.create({
+  await prisma.audit_entries.create({
     data: {
-      lineItemId,
+      line_item_id: lineItemId,
       action: 'PASS2_NORMALISED',
-      unitConversionLogic,
+      unit_conversion_logic: unitConversionLogic,
       metadata: {
         normalised,
         missingMandatory,

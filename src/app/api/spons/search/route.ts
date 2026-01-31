@@ -26,11 +26,11 @@ export async function GET(request: NextRequest) {
       where.OR = [
         { description: { contains: query, mode: 'insensitive' } },
         { tags: { has: query.toLowerCase() } },
-        { itemCode: { contains: query, mode: 'insensitive' } },
+        { item_code: { contains: query, mode: 'insensitive' } },
       ]
     }
 
-    const results = await prisma.sponsItem.findMany({
+    const results = await prisma.spons_items.findMany({
       where,
       take: limit,
       orderBy: {

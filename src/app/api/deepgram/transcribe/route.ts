@@ -23,34 +23,34 @@ export async function POST(request: NextRequest) {
 
     // Update capture with transcript
     if (captureId) {
-      await prisma.capture.update({
+      await prisma.captures.update({
         where: { id: captureId },
         data: {
           transcript: result.transcript,
-          transcribedAt: new Date(),
-          rawQuantities: extractQuantities(result.transcript),
-          rawComponents: extractComponents(result.transcript),
+          transcribed_at: new Date(),
+          raw_quantities: extractQuantities(result.transcript),
+          raw_components: extractComponents(result.transcript),
         },
       })
     }
 
     // Update line item status to PASS1_COMPLETE
     if (lineItemId) {
-      await prisma.lineItem.update({
+      await prisma.line_items.update({
         where: { id: lineItemId },
         data: {
           status: 'PASS1_COMPLETE',
-          rawTranscript: result.transcript,
-          transcriptTimestamp: new Date(),
+          raw_transcript: result.transcript,
+          transcript_timestamp: new Date(),
         },
       })
 
       // Create audit entry
-      await prisma.auditEntry.create({
+      await prisma.audit_entries.create({
         data: {
-          lineItemId,
+          line_item_id: lineItemId,
           action: 'TRANSCRIBED',
-          spokenSentence: result.transcript,
+          spoken_sentence: result.transcript,
         },
       })
     }

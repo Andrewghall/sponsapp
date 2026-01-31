@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
     for (const capture of captures) {
       try {
         // Check idempotency - skip if already processed
-        const existing = await prisma.capture.findUnique({
-          where: { idempotencyKey: capture.idempotencyKey },
+        const existing = await prisma.captures.findUnique({
+          where: { idempotency_key: capture.idempotencyKey },
         })
 
         if (existing) {
@@ -26,13 +26,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Create line item for this capture
-        const lineItem = await prisma.lineItem.create({
+        const lineItem = await prisma.line_items.create({
           data: {
-            projectId: capture.projectId,
-            zoneId: capture.zoneId,
+            project_id: capture.projectId,
+            zone_id: capture.zoneId,
             status: 'PENDING_PASS1',
-            rawTranscript: capture.transcript,
-            transcriptTimestamp: new Date(capture.timestamp),
+            raw_transcript: capture.transcript,
+            transcript_timestamp: new Date(capture.timestamp),
           },
         })
 
@@ -59,25 +59,25 @@ export async function POST(request: NextRequest) {
         }
 
         // Create capture record
-        await prisma.capture.create({
+        await prisma.captures.create({
           data: {
             id: capture.id,
-            lineItemId: lineItem.id,
-            idempotencyKey: capture.idempotencyKey,
-            audioUrl,
-            audioDuration: capture.audioDuration,
+            line_item_id: lineItem.id,
+            idempotency_key: capture.idempotencyKey,
+            audio_url: audioUrl,
+            audio_duration: capture.audioDuration,
             transcript: capture.transcript,
-            isOffline: true,
-            syncedAt: new Date(),
+            is_offline: true,
+            synced_at: new Date(),
           },
         })
 
         // Create audit entry
-        await prisma.auditEntry.create({
+        await prisma.audit_entries.create({
           data: {
-            lineItemId: lineItem.id,
+            line_item_id: lineItem.id,
             action: 'CREATED',
-            spokenSentence: capture.transcript,
+            spoken_sentence: capture.transcript,
             metadata: {
               source: 'offline_sync',
               originalTimestamp: capture.timestamp,
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
 // GET /api/sync - Get pending items for processing
 export async function GET() {
   try {
-    const pendingItems = await prisma.lineItem.findMany({
+    const pendingItems = await prisma.line_items.findMany({
       where: {
         status: {
           in: ['PENDING_PASS1', 'PASS1_COMPLETE', 'PENDING_PASS2'],
@@ -119,7 +119,7 @@ export async function GET() {
         captures: true,
       },
       orderBy: {
-        createdAt: 'asc',
+        created_at: 'asc',
       },
       take: 50,
     })
