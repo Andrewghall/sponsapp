@@ -5,6 +5,13 @@ import { prisma } from '@/lib/prisma'
 // POST /api/deepgram/transcribe - Batch transcription for offline audio
 export async function POST(request: NextRequest) {
   try {
+    if (!process.env.DEEPGRAM_API_KEY) {
+      return NextResponse.json(
+        { error: 'Server missing DEEPGRAM_API_KEY' },
+        { status: 500 }
+      )
+    }
+
     const formData = await request.formData()
     const audioFile = formData.get('audio') as File
     const captureId = formData.get('captureId') as string
@@ -13,6 +20,13 @@ export async function POST(request: NextRequest) {
     if (!audioFile) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 })
     }
+
+    console.log('Transcribe request', {
+      captureId: captureId || undefined,
+      lineItemId: lineItemId || undefined,
+      audioType: audioFile?.type,
+      audioSize: audioFile?.size,
+    })
 
     // Convert to buffer
     const arrayBuffer = await audioFile.arrayBuffer()
@@ -63,9 +77,10 @@ export async function POST(request: NextRequest) {
       rawComponents: extractComponents(result.transcript),
     })
   } catch (error) {
-    console.error('Transcription error:', error)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('Transcription error:', message)
     return NextResponse.json(
-      { error: 'Transcription failed' },
+      { error: 'Transcription failed', details: message },
       { status: 500 }
     )
   }

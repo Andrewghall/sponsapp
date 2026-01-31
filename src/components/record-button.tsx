@@ -205,7 +205,11 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
 
             if (!res.ok) {
               const data = await res.json().catch(() => ({}))
-              throw new Error(data?.error || `Transcription failed (${res.status})`)
+              const msg =
+                typeof data?.details === 'string'
+                  ? `${data?.error || 'Transcription failed'}: ${data.details}`
+                  : (data?.error as string | undefined) || 'Transcription failed'
+              throw new Error(`${msg} (HTTP ${res.status})`)
             }
 
             const data = await res.json()
@@ -218,8 +222,9 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
               onStatusChange?.('Saved (no transcript)')
             }
           } catch (e) {
+            const message = e instanceof Error ? e.message : String(e)
             console.error(e)
-            onStatusChange?.('Saved. Transcription failed (will sync later)')
+            onStatusChange?.(`Saved. Transcription failed: ${message}`)
           }
         } else {
           onStatusChange?.('Saved offline (will sync later)')
