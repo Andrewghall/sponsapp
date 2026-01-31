@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { transcribeAudio } from '@/lib/deepgram'
 import { prisma } from '@/lib/prisma'
+import { processPass2 } from '@/lib/processing/pass2'
 
 // POST /api/deepgram/transcribe - Batch transcription for offline audio
 export async function POST(request: NextRequest) {
@@ -87,6 +88,14 @@ export async function POST(request: NextRequest) {
           spoken_sentence: result.transcript,
         },
       })
+
+      // Auto-trigger Pass 2 (normalisation + retrieval)
+      try {
+        await processPass2(lineItemId)
+      } catch (pass2Error) {
+        console.error('Pass 2 failed after transcription:', pass2Error)
+        // Continue; UI will show PASS1_COMPLETE and manual retry can be added later
+      }
     }
 
     return NextResponse.json({

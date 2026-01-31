@@ -3,8 +3,10 @@
 // - Unit conversion
 // - Taxonomy mapping
 // - Mandatory field validation
+// - Retrieval-only SPONS candidate lookup
 
 import { prisma } from '@/lib/prisma'
+import { retrieveCandidates } from './retrieval'
 
 export interface Pass2Result {
   lineItemId: string
@@ -20,6 +22,7 @@ export interface Pass2Result {
   unitConversionLogic?: string
   missingMandatory: string[]
   isValid: boolean
+  candidates?: any[]
 }
 
 // Mandatory fields for pricing-safe completion
@@ -123,12 +126,24 @@ export async function processPass2(lineItemId: string): Promise<Pass2Result> {
     },
   })
 
+  // If valid, run retrieval-only SPONS candidate lookup
+  let candidates: any[] = []
+  if (isValid) {
+    try {
+      candidates = await retrieveCandidates(lineItemId)
+    } catch (err) {
+      console.error('Retrieval failed after Pass 2:', err)
+      // Continue; status will remain PASS2_COMPLETE or PENDING_PASS2
+    }
+  }
+
   return {
     lineItemId,
     normalised,
     unitConversionLogic,
     missingMandatory,
     isValid,
+    candidates,
   }
 }
 
