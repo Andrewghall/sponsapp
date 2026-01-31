@@ -10,9 +10,10 @@ interface RecordButtonProps {
   projectId: string
   zoneId?: string
   onCaptureComplete: (captureId: string) => void
+  onStatusChange?: (statusText: string) => void
 }
 
-export function RecordButton({ projectId, zoneId, onCaptureComplete }: RecordButtonProps) {
+export function RecordButton({ projectId, zoneId, onCaptureComplete, onStatusChange }: RecordButtonProps) {
   const { 
     recordingStatus, 
     setRecordingStatus, 
@@ -116,6 +117,7 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete }: RecordBut
 
   const startRecording = useCallback(async () => {
     try {
+      onStatusChange?.('Requesting microphone…')
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -172,17 +174,20 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete }: RecordBut
       mediaRecorder.start(250)
       setRecordingStatus('recording')
       setLiveTranscript('')
+      onStatusChange?.('Listening…')
       
     } catch (error) {
       console.error('Failed to start recording:', error)
       alert('Could not access microphone. Please check permissions.')
+      onStatusChange?.('Microphone permission needed')
     }
-  }, [connectionStatus, setRecordingStatus, setLiveTranscript, startMetering])
+  }, [connectionStatus, onStatusChange, setRecordingStatus, setLiveTranscript, startMetering])
 
   const stopRecording = useCallback(async () => {
     if (!mediaRecorderRef.current) return
 
     setRecordingStatus('processing')
+    onStatusChange?.('Saving audio…')
 
     return new Promise<void>((resolve) => {
       mediaRecorderRef.current!.onstop = async () => {
@@ -214,25 +219,26 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete }: RecordBut
 
         incrementPending()
         setRecordingStatus('idle')
+        onStatusChange?.('Saved. Transcribing…')
         onCaptureComplete(captureId)
         resolve()
       }
 
       mediaRecorderRef.current!.stop()
     })
-  }, [projectId, zoneId, setRecordingStatus, incrementPending, onCaptureComplete, stopMetering])
+  }, [projectId, zoneId, setRecordingStatus, incrementPending, onCaptureComplete, onStatusChange, stopMetering])
 
   const isRecording = recordingStatus === 'recording'
   const isProcessing = recordingStatus === 'processing'
 
-  const bars = [0.15, 0.35, 0.55, 0.75, 0.95].map((threshold, i) => {
-    const active = isRecording && level > threshold
-    const height = isRecording ? 10 + Math.round(level * 24) : 8
+  const segments = Array.from({ length: 16 }, (_, i) => {
+    const t = (i + 1) / 16
+    const active = isRecording ? level >= t : false
+    const color = i < 10 ? 'bg-green-500' : i < 14 ? 'bg-amber-500' : 'bg-red-500'
     return (
       <div
         key={i}
-        className={`w-2 rounded-full transition-colors duration-100 ${active ? 'bg-white' : 'bg-white/40'}`}
-        style={{ height }}
+        className={`h-2 w-3 rounded-sm transition-opacity duration-75 ${color} ${active ? 'opacity-100' : 'opacity-20'}`}
       />
     )
   })
@@ -261,7 +267,9 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete }: RecordBut
       </button>
 
       <div className={`mt-4 flex items-end gap-2 ${isRecording ? '' : 'opacity-60'}`}>
-        {bars}
+        <div className="flex items-center gap-1">
+          {segments}
+        </div>
       </div>
     </div>
   )

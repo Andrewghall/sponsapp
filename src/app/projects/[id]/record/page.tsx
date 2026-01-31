@@ -13,8 +13,9 @@ export default function RecordPage() {
   const router = useRouter()
   const projectId = params.id as string
   
-  const { liveTranscript, currentZoneId } = useAppStore()
+  const { liveTranscript, currentZoneId, connectionStatus } = useAppStore()
   const [recentCaptures, setRecentCaptures] = useState<string[]>([])
+  const [statusText, setStatusText] = useState<string>('')
 
   const handleCaptureComplete = useCallback((captureId: string) => {
     setRecentCaptures(prev => [captureId, ...prev].slice(0, 5))
@@ -61,7 +62,18 @@ export default function RecordPage() {
           projectId={projectId}
           zoneId={currentZoneId || undefined}
           onCaptureComplete={handleCaptureComplete}
+          onStatusChange={setStatusText}
         />
+
+        <div className="mt-4 text-sm text-gray-600 text-center min-h-[20px]">
+          {statusText}
+        </div>
+
+        <div className="mt-2 text-xs text-gray-400 text-center">
+          {connectionStatus === 'online'
+            ? 'Online: will transcribe after you stop.'
+            : 'Offline: saved locally and will sync later.'}
+        </div>
 
         {/* Instructions */}
         <p className="text-sm text-gray-500 mt-6 text-center max-w-xs">
