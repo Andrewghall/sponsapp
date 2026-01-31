@@ -11,12 +11,14 @@ export default function NewProjectPage() {
   const [client, setClient] = useState('')
   const [siteAddress, setSiteAddress] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
 
     setIsSubmitting(true)
+    setError(null)
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
@@ -27,9 +29,13 @@ export default function NewProjectPage() {
       if (res.ok) {
         const project = await res.json()
         router.push(`/projects/${project.id}`)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to create project')
       }
-    } catch (error) {
-      console.error('Failed to create project:', error)
+    } catch (err) {
+      console.error('Failed to create project:', err)
+      setError('Network error - please try again')
     } finally {
       setIsSubmitting(false)
     }
@@ -45,6 +51,11 @@ export default function NewProjectPage() {
       </header>
 
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Project Name *
@@ -54,7 +65,7 @@ export default function NewProjectPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Amazon MAN1 Survey"
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
             required
           />
         </div>
@@ -68,7 +79,7 @@ export default function NewProjectPage() {
             value={client}
             onChange={(e) => setClient(e.target.value)}
             placeholder="e.g. Amazon"
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
           />
         </div>
 
@@ -81,7 +92,7 @@ export default function NewProjectPage() {
             onChange={(e) => setSiteAddress(e.target.value)}
             placeholder="Full site address"
             rows={3}
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white text-gray-900"
           />
         </div>
 
