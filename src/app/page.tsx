@@ -2,6 +2,8 @@ import Link from "next/link";
 import { FolderOpen, Plus, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   const projects = await prisma.projects.findMany({
     orderBy: { updated_at: 'desc' },
