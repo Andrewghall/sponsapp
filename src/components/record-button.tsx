@@ -232,11 +232,20 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
               throw new Error(`${msg} (HTTP ${syncRes.status})`)
             }
 
+            const syncData = await syncRes.json()
+            const lineItemMap = syncData?.lineItemIds as Array<{ captureId: string; lineItemId: string }> | undefined
+            const lineItem = lineItemMap?.find(m => m.captureId === captureId)
+            const lineItemId = lineItem?.lineItemId
+
+            if (!lineItemId) {
+              throw new Error('Sync did not return lineItemId for this capture')
+            }
+
             onStatusChange?.('Transcribing…')
             const formData = new FormData()
             formData.append('audio', new File([audioBlob], `${captureId}.webm`, { type: 'audio/webm' }))
             formData.append('captureId', captureId)
-            formData.append('lineItemId', captureId)
+            formData.append('lineItemId', lineItemId)
 
             const res = await fetch('/api/deepgram/transcribe', {
               method: 'POST',

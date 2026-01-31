@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
       synced: 0,
       failed: 0,
       errors: [] as string[],
+      lineItemIds: [] as { captureId: string; lineItemId: string }[],
     }
 
     for (const capture of captures) {
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
             transcript_timestamp: new Date(capture.timestamp),
           },
         })
+
+        results.lineItemIds.push({ captureId: capture.id, lineItemId: lineItem.id })
 
         // Upload audio to Supabase Storage
         let audioUrl = null
