@@ -26,7 +26,7 @@ export async function GET() {
 // POST /api/projects - Create new project
 export async function POST(request: NextRequest) {
   try {
-    const { name, client, siteAddress } = await request.json()
+    const { name, ownerName, client, siteAddress } = await request.json()
 
     if (!name) {
       return NextResponse.json(
@@ -35,9 +35,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!ownerName) {
+      return NextResponse.json(
+        { error: 'Owner name is required' },
+        { status: 400 }
+      )
+    }
+
     const project = await prisma.projects.create({
       data: {
         name,
+        owner_name: ownerName,
         client,
         site_address: siteAddress,
       },

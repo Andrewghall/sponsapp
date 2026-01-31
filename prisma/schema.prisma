@@ -137,6 +137,8 @@ model projects {
   name         String
   client       String?
   site_address String?
+  owner_name   String?
+  owner_id     String?
   created_at   DateTime?    @default(now()) @db.Timestamptz(6)
   updated_at   DateTime?    @default(now()) @db.Timestamptz(6)
   exports      exports[]

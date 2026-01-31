@@ -8,6 +8,7 @@ import Link from 'next/link'
 export default function NewProjectPage() {
   const router = useRouter()
   const [name, setName] = useState('')
+  const [ownerName, setOwnerName] = useState('')
   const [client, setClient] = useState('')
   const [siteAddress, setSiteAddress] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -15,7 +16,7 @@ export default function NewProjectPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!name.trim() || !ownerName.trim()) return
 
     setIsSubmitting(true)
     setError(null)
@@ -23,7 +24,7 @@ export default function NewProjectPage() {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, client, siteAddress }),
+        body: JSON.stringify({ name, ownerName, client, siteAddress }),
       })
 
       if (res.ok) {
@@ -72,6 +73,20 @@ export default function NewProjectPage() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
+            Your Name *
+          </label>
+          <input
+            type="text"
+            value={ownerName}
+            onChange={(e) => setOwnerName(e.target.value)}
+            placeholder="e.g. John Smith"
+            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Client
           </label>
           <input
@@ -98,7 +113,7 @@ export default function NewProjectPage() {
 
         <button
           type="submit"
-          disabled={!name.trim() || isSubmitting}
+          disabled={!name.trim() || !ownerName.trim() || isSubmitting}
           className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? 'Creating...' : 'Create Project'}
