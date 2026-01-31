@@ -10,7 +10,8 @@ export function middleware(request: NextRequest) {
     request.nextUrl.pathname === '/favicon.ico' ||
     request.nextUrl.pathname.startsWith('/icons') ||
     request.nextUrl.pathname === '/robots.txt' ||
-    request.nextUrl.pathname === '/sitemap.xml'
+    request.nextUrl.pathname === '/sitemap.xml' ||
+    request.nextUrl.pathname.endsWith('manifest.json') // Allow any path ending with manifest.json
   ) {
     return NextResponse.next()
   }
