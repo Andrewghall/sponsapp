@@ -193,10 +193,50 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
 
         if (connectionStatus === 'online') {
           try {
+            onStatusChange?.('Uploading…')
+
+            const audioBase64 = await new Promise<string>((resolveBase64, rejectBase64) => {
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                const result = reader.result
+                if (typeof result !== 'string') return rejectBase64(new Error('Failed to encode audio'))
+                const commaIndex = result.indexOf(',')
+                resolveBase64(commaIndex >= 0 ? result.slice(commaIndex + 1) : result)
+              }
+              reader.onerror = () => rejectBase64(new Error('Failed to read audio blob'))
+              reader.readAsDataURL(audioBlob)
+            })
+
+            const syncRes = await fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                captures: [
+                  {
+                    id: captureId,
+                    idempotencyKey,
+                    audioBase64,
+                    audioDuration: duration,
+                    timestamp: new Date().toISOString(),
+                    projectId,
+                    zoneId,
+                    transcript: '',
+                  },
+                ],
+              }),
+            })
+
+            if (!syncRes.ok) {
+              const data = await syncRes.json().catch(() => ({}))
+              const msg = (data?.error as string | undefined) || 'Upload failed'
+              throw new Error(`${msg} (HTTP ${syncRes.status})`)
+            }
+
             onStatusChange?.('Transcribing…')
             const formData = new FormData()
             formData.append('audio', new File([audioBlob], `${captureId}.webm`, { type: 'audio/webm' }))
             formData.append('captureId', captureId)
+            formData.append('lineItemId', captureId)
 
             const res = await fetch('/api/deepgram/transcribe', {
               method: 'POST',
