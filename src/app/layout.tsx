@@ -1,12 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { ConnectionStatusBar } from "@/components/connection-status";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "SPONSApp - Warehouse Survey",
@@ -34,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased bg-gray-50`}>
+      <body className="font-sans antialiased bg-gray-50">
         <div className="min-h-screen flex flex-col">
           <ConnectionStatusBar />
           <main className="flex-1">
