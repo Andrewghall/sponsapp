@@ -10,10 +10,11 @@ interface RecordButtonProps {
   projectId: string
   zoneId?: string
   onCaptureComplete: (captureId: string) => void
+  onCaptureCompleteWithTranscript?: (captureId: string, transcript: string) => void
   onStatusChange?: (statusText: string) => void
 }
 
-export function RecordButton({ projectId, zoneId, onCaptureComplete, onStatusChange }: RecordButtonProps) {
+export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCompleteWithTranscript, onStatusChange }: RecordButtonProps) {
   const { 
     recordingStatus, 
     setRecordingStatus, 
@@ -139,35 +140,6 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onStatusCha
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data)
-          
-          // If online, send to Deepgram for live transcription
-          if (connectionStatus === 'online' && websocketRef.current?.readyState === WebSocket.OPEN) {
-            event.data.arrayBuffer().then(buffer => {
-              websocketRef.current?.send(buffer)
-            })
-          }
-        }
-      }
-
-      // Start live transcription if online
-      if (connectionStatus === 'online') {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const ws = new WebSocket(`${protocol}//${window.location.host}/api/deepgram/stream`)
-        websocketRef.current = ws
-        
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            if (data.transcript) {
-              setLiveTranscript(data.transcript)
-            }
-          } catch (e) {
-            console.error('Failed to parse transcript:', e)
-          }
-        }
-        
-        ws.onerror = () => {
-          console.log('WebSocket error - continuing offline')
         }
       }
 
@@ -218,15 +190,49 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onStatusCha
         })
 
         incrementPending()
+
+        if (connectionStatus === 'online') {
+          try {
+            onStatusChange?.('Transcribing…')
+            const formData = new FormData()
+            formData.append('audio', new File([audioBlob], `${captureId}.webm`, { type: 'audio/webm' }))
+            formData.append('captureId', captureId)
+
+            const res = await fetch('/api/deepgram/transcribe', {
+              method: 'POST',
+              body: formData,
+            })
+
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}))
+              throw new Error(data?.error || `Transcription failed (${res.status})`)
+            }
+
+            const data = await res.json()
+            const transcript = typeof data?.transcript === 'string' ? data.transcript : ''
+            if (transcript) {
+              setLiveTranscript(transcript)
+              onStatusChange?.('Transcribed')
+              onCaptureCompleteWithTranscript?.(captureId, transcript)
+            } else {
+              onStatusChange?.('Saved (no transcript)')
+            }
+          } catch (e) {
+            console.error(e)
+            onStatusChange?.('Saved. Transcription failed (will sync later)')
+          }
+        } else {
+          onStatusChange?.('Saved offline (will sync later)')
+        }
+
         setRecordingStatus('idle')
-        onStatusChange?.('Saved. Transcribing…')
         onCaptureComplete(captureId)
         resolve()
       }
 
       mediaRecorderRef.current!.stop()
     })
-  }, [projectId, zoneId, setRecordingStatus, incrementPending, onCaptureComplete, onStatusChange, stopMetering])
+  }, [projectId, zoneId, setRecordingStatus, incrementPending, onCaptureComplete, onCaptureCompleteWithTranscript, onStatusChange, stopMetering, connectionStatus, setLiveTranscript])
 
   const isRecording = recordingStatus === 'recording'
   const isProcessing = recordingStatus === 'processing'

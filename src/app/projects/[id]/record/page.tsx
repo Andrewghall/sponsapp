@@ -8,17 +8,29 @@ import { RecordButton } from '@/components/record-button'
 import { LineCard } from '@/components/line-card'
 import { useAppStore } from '@/store'
 
+type RecentCapture = {
+  id: string
+  status: 'PENDING_PASS1' | 'PASS1_COMPLETE'
+  transcript?: string
+}
+
 export default function RecordPage() {
   const params = useParams()
   const router = useRouter()
   const projectId = params.id as string
   
   const { liveTranscript, currentZoneId, connectionStatus } = useAppStore()
-  const [recentCaptures, setRecentCaptures] = useState<string[]>([])
+  const [recentCaptures, setRecentCaptures] = useState<RecentCapture[]>([])
   const [statusText, setStatusText] = useState<string>('')
 
   const handleCaptureComplete = useCallback((captureId: string) => {
-    setRecentCaptures(prev => [captureId, ...prev].slice(0, 5))
+    setRecentCaptures((prev) => [{ id: captureId, status: 'PENDING_PASS1' } as RecentCapture, ...prev].slice(0, 5))
+  }, [])
+
+  const handleCaptureCompleteWithTranscript = useCallback((captureId: string, transcript: string) => {
+    setRecentCaptures(prev =>
+      prev.map((c) => (c.id === captureId ? { ...c, status: 'PASS1_COMPLETE', transcript } : c))
+    )
   }, [])
 
   return (
@@ -62,6 +74,7 @@ export default function RecordPage() {
           projectId={projectId}
           zoneId={currentZoneId || undefined}
           onCaptureComplete={handleCaptureComplete}
+          onCaptureCompleteWithTranscript={handleCaptureCompleteWithTranscript}
           onStatusChange={setStatusText}
         />
 
@@ -86,12 +99,12 @@ export default function RecordPage() {
         <div className="bg-white border-t border-gray-200 p-4">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Recent captures</h3>
           <div className="space-y-2">
-            {recentCaptures.map((captureId) => (
+            {recentCaptures.map((capture) => (
               <LineCard
-                key={captureId}
-                id={captureId}
-                status="PENDING_PASS1"
-                transcript="Processing..."
+                key={capture.id}
+                id={capture.id}
+                status={capture.status}
+                transcript={capture.transcript || 'Processing...'}
               />
             ))}
           </div>
