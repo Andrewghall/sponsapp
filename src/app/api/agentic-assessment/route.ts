@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { splitTranscriptIntoObservations } from '@/lib/processing/observation-splitter'
-import { runCompleteAgenticLoop } from '@/lib/processing/final-agentic-loop'
+import { runCompleteAgenticLoop } from '@/lib/processing/execution-loop'
 import { normalizeTranscript, detectMultipleAssets } from '@/lib/processing/agentic-matcher'
 import { v4 as uuidv4 } from 'uuid'
 
