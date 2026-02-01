@@ -67,8 +67,32 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
     const compatibleUnitsArray = compatibleUnits(normalized.unit)
     console.log('Compatible units array:', compatibleUnitsArray)
     
-    // Build query with Prisma.sql bindings (preferred approach)
-    const similarityResults = await prisma.$queryRaw<Array<{
+    // Build SQL string for $queryRawUnsafe
+    let sqlString = `SELECT 
+        id, item_code, description, unit, trade, book, section, rate,
+        (embedding <=> $3::vector) AS similarity
+      FROM spons_items
+      WHERE unit = ANY($1::text[])`
+    
+    const params: any[] = [compatibleUnitsArray]
+    
+    if (normalized.trade) {
+      sqlString += ` AND trade = $2::text`
+      params.push(normalized.trade)
+    } else {
+      // If no trade, we need to adjust the embedding parameter index
+      sqlString = sqlString.replace('$3::vector', '$2::vector')
+    }
+    
+    sqlString += ` AND embedding IS NOT NULL ORDER BY similarity ASC LIMIT ${MAX_CANDIDATES}`
+    
+    // Add embedding as last parameter
+    params.push(normalized.description)
+    
+    console.log('SQL string:', sqlString)
+    console.log('Params:', params)
+    
+    const similarityResults = await prisma.$queryRawUnsafe<Array<{
       id: string
       item_code: string
       description: string
@@ -78,20 +102,7 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
       section?: string
       rate?: number
       similarity: number
-    }>>(
-      Prisma.sql`SELECT 
-        id, item_code, description, unit, trade, book, section, rate,
-        (embedding <=> ${normalized.description}::vector) AS similarity
-      FROM spons_items
-      WHERE 
-        unit = ANY(${compatibleUnitsArray}::text[])
-        ${normalized.trade ? Prisma.sql`AND trade = ${normalized.trade}::text` : Prisma.empty}
-        AND embedding IS NOT NULL
-      ORDER BY similarity ASC
-      LIMIT ${MAX_CANDIDATES}`
-    )
-    
-    console.log('Query executed with units:', compatibleUnitsArray, 'trade:', normalized.trade)
+    }>>(sqlString, ...params)
 
     for (const row of similarityResults) {
       const score = 1 - row.similarity // Convert distance to similarity
