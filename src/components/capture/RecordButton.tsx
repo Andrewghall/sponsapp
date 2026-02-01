@@ -152,20 +152,24 @@ export function RecordButton({
   }
 
   return (
-    <div className="flex flex-col items-center gap-6">
-      {/* Status Message */}
+    <>
+      {/* Status Message - Fixed at top */}
       {statusMessage && (
-        <div className={cn(
-          "flex items-center gap-2 px-4 py-2 rounded-lg text-sm",
-          status === 'complete' && "bg-green-100 text-green-800",
-          status === 'error' && "bg-red-100 text-red-800",
-          status === 'processing' && "bg-blue-100 text-blue-800"
-        )}>
-          {status === 'complete' && <CheckCircle size={16} />}
-          {status === 'error' && <AlertCircle size={16} />}
-          {statusMessage}
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm shadow-lg",
+            status === 'complete' && "bg-green-100 text-green-800",
+            status === 'error' && "bg-red-100 text-red-800",
+            status === 'processing' && "bg-blue-100 text-blue-800"
+          )}>
+            {status === 'complete' && <CheckCircle size={16} />}
+            {status === 'error' && <AlertCircle size={16} />}
+            {statusMessage}
+          </div>
         </div>
       )}
+
+      <div className="flex flex-col items-center gap-6">
 
       {/* Recording Timer */}
       {isRecording && (
@@ -235,5 +239,6 @@ export function RecordButton({
         </div>
       )}
     </div>
+    </>
   )
 }
