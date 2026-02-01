@@ -5,6 +5,7 @@ import { Mic, Square } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { saveOfflineCapture } from '@/lib/offline-db'
 import { v4 as uuidv4 } from 'uuid'
+import { useRouter } from 'next/navigation'
 
 interface RecordButtonProps {
   projectId: string
@@ -15,6 +16,7 @@ interface RecordButtonProps {
 }
 
 export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCompleteWithTranscript, onStatusChange }: RecordButtonProps) {
+  const router = useRouter()
   const { 
     recordingStatus, 
     setRecordingStatus, 
@@ -290,15 +292,20 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             
             if (transcript) {
               setLiveTranscript(transcript)
-              onStatusChange?.('Processing…')
+              onStatusChange?.('Saved')
               onCaptureCompleteWithTranscript?.(captureId, transcript)
               
-              // Start polling for status updates
+              // Refresh items list immediately
+              router.refresh()
+              
+              // Start polling for Pass 2 status updates (async, non-blocking)
               setTimeout(() => {
                 pollForStatus(captureId)
               }, 2000)
             } else {
               onStatusChange?.('Saved (no transcript)')
+              // Refresh items list even without transcript
+              router.refresh()
             }
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e)
