@@ -150,6 +150,13 @@ export async function POST(request: NextRequest) {
         // Calculate confidence (simple heuristic based on similarity score)
         const confidence = candidates.length > 0 ? Math.min(0.99, candidates[0].similarity_score * 100 || 0.5) : 0
         
+        // Map candidates to plain JSON for Prisma
+        const candidatesJson = candidates.slice(0, 5).map(c => ({
+          item_code: String(c.item_code),
+          description: String(c.description ?? ""),
+          score: Number(c.similarity_score ?? 0)
+        }))
+        
         // Determine status
         const status = confidence >= 0.75 ? 'MATCHED' : 'QS_REVIEW'
         
@@ -161,7 +168,7 @@ export async function POST(request: NextRequest) {
             pass2_confidence: confidence,
             spons_candidate_code: candidates.length > 0 ? candidates[0].item_code : null,
             spons_candidate_label: candidates.length > 0 ? candidates[0].description : null,
-            spons_candidates: candidates.slice(0, 5),
+            spons_candidates: candidatesJson,
           },
         })
         
