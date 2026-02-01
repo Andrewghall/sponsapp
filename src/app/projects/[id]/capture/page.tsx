@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Wifi, WifiOff, MoreHorizontal } from 'lucide-react'
+import { ArrowLeft, Wifi, WifiOff, MoreHorizontal, Edit3 } from 'lucide-react'
 import { RecordButton } from '@/components/capture/RecordButton'
 import { ContextSelector } from '@/components/capture/ContextSelector'
 import { useContextPersistence, formatContext } from '@/lib/context/ContextManager'
@@ -76,7 +76,13 @@ export default function CapturePage() {
                 Amazon MAN3
               </h1>
               <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span>{formatContext(context)}</span>
+                <button
+                  onClick={() => setShowContextSelector(!showContextSelector)}
+                  className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                >
+                  <span>{formatContext(context)}</span>
+                  <Edit3 size={12} />
+                </button>
                 <span>•</span>
                 <div className="flex items-center gap-1">
                   {isOnline ? (

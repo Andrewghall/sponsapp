@@ -35,6 +35,10 @@ export function ContextSelector({ context, onChange, recentContexts, onClose }: 
     setVoiceInputField(null)
   }
 
+  const handleSave = () => {
+    onClose()
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
