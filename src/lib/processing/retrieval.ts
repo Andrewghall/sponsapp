@@ -29,7 +29,15 @@ const MAX_CANDIDATES = 10
  */
 export async function retrieveCandidates(
   lineItemId: string,
-  normalized: NormalisedFields,
+  normalizedFields: {
+    type?: string
+    category?: string
+    description?: string
+    floor?: string
+    location?: string
+    assetCondition?: 'LOW' | 'MEDIUM' | 'HIGH'
+    observations?: string
+  },
   traceId?: string
 ): Promise<RetrievedCandidate[]> {
   const lineItem = await prisma.line_items.findUnique({
@@ -46,40 +54,38 @@ export async function retrieveCandidates(
   const capture = lineItem.captures[0]
   if (!capture) throw new Error('No capture found for line item')
 
-  const normalized = {
-    type: lineItem.col_b_type || undefined,
-    category: lineItem.col_c_category || undefined,
-    description: lineItem.col_g_description || undefined,
-    unit: extractUnitFromQuantities(capture.raw_quantities as { value: number; unit: string }[]),
-    trade: inferTradeFromType(lineItem.col_b_type || undefined, lineItem.col_c_category || undefined),
-  }
+  console.log(`[${traceId || 'unknown'}] Using normalized fields:`, normalizedFields)
+
+  // Extract unit from capture for compatibility check
+  const unit = extractUnitFromQuantities(capture.raw_quantities as { value: number; unit: string }[])
+  const trade = inferTradeFromType(normalizedFields.type, normalizedFields.category)
 
   // 1. Filter by trade and compatible unit
   const baseQuery = {
     where: {
-      ...(normalized.trade && { trade: normalized.trade }),
+      ...(trade && { trade }),
       unit: {
-        in: compatibleUnits(normalized.unit),
+        in: compatibleUnits(unit),
       },
     },
   }
 
   // 2. Vector similarity on description (if embedding exists)
   const candidates: RetrievedCandidate[] = []
-  if (normalized.description) {
+  if (normalizedFields.description) {
     // Get compatible units as PostgreSQL array
-    const compatibleUnitsArray = compatibleUnits(normalized.unit)
+    const compatibleUnitsArray = compatibleUnits(unit)
     console.log(`[${traceId || 'unknown'}] Compatible units array:`, compatibleUnitsArray)
     
     // Build query with Prisma.sql (safe parameter binding)
     let query = Prisma.sql`SELECT 
         id, item_code, description, unit, trade, book, section, rate,
-        (embedding <=> ${normalized.description}::vector) AS similarity
+        (embedding <=> ${normalizedFields.description}::vector) AS similarity
       FROM spons_items
       WHERE unit = ANY(${compatibleUnitsArray}::text[])`
     
-    if (normalized.trade) {
-      query = Prisma.sql`${query} AND trade = ${normalized.trade}::text`
+    if (trade) {
+      query = Prisma.sql`${query} AND trade = ${trade}::text`
     }
     
     query = Prisma.sql`${query} AND embedding IS NOT NULL
@@ -116,8 +122,8 @@ export async function retrieveCandidates(
         section: row.section,
         rate: row.rate ? Number(row.rate) : undefined,
         similarity_score: score,
-        unit_matches: areUnitsCompatible(normalized.unit, row.unit),
-        trade_matches: normalized.trade ? normalized.trade === row.trade : false,
+        unit_matches: areUnitsCompatible(unit, row.unit),
+        trade_matches: trade ? trade === row.trade : false,
       })
     }
   }
