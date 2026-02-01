@@ -9,9 +9,13 @@ export function middleware(request: NextRequest) {
     request.nextUrl.pathname === '/manifest.json' ||
     request.nextUrl.pathname === '/favicon.ico' ||
     request.nextUrl.pathname.startsWith('/icons') ||
+    request.nextUrl.pathname.startsWith('/apple-touch-icon') ||
     request.nextUrl.pathname === '/robots.txt' ||
     request.nextUrl.pathname === '/sitemap.xml' ||
-    request.nextUrl.pathname.endsWith('manifest.json') // Allow any path ending with manifest.json
+    request.nextUrl.pathname.endsWith('manifest.json') || // Allow any path ending with manifest.json
+    request.nextUrl.pathname.endsWith('.png') ||
+    request.nextUrl.pathname.endsWith('.ico') ||
+    request.nextUrl.pathname.endsWith('.svg')
   ) {
     return NextResponse.next()
   }

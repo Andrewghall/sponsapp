@@ -5,6 +5,7 @@ import { Mic, Square, CheckCircle, AlertCircle } from 'lucide-react'
 import { createOfflineCapture, updateCaptureSyncStatus } from '@/lib/offline-db'
 import { CaptureContext } from '@/lib/context/ContextManager'
 import { getSyncManager } from '@/lib/sync/SyncManager'
+import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 
 interface RecordButtonProps {
@@ -20,6 +21,7 @@ export function RecordButton({
   onCaptureComplete, 
   onSyncStatusChange 
 }: RecordButtonProps) {
+  const { connectionStatus } = useAppStore()
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'complete' | 'error'>('idle')
@@ -58,24 +60,33 @@ export function RecordButton({
         setStatusMessage('Saving capture...')
 
         try {
-          // Create offline capture
-          const capture = await createOfflineCapture(projectId, context, audioBlob, duration)
-          
-          setStatusMessage('Saved offline - will sync automatically')
-          setStatus('complete')
-          
-          onCaptureComplete?.(capture.id)
+          if (connectionStatus === 'online') {
+            // Process online when connection is good
+            setStatusMessage('Processing online...')
+            // TODO: Implement online processing - for now save locally but don't show "offline"
+            const capture = await createOfflineCapture(projectId, context, audioBlob, duration)
+            setStatusMessage('Processing...')
+            setStatus('complete')
+            
+            onCaptureComplete?.(capture.id)
+            
+            // Trigger sync immediately since we're online
+            const syncManager = getSyncManager()
+            syncManager.processPendingCaptures()
+          } else {
+            // Only show "Saved offline" when actually offline
+            const capture = await createOfflineCapture(projectId, context, audioBlob, duration)
+            
+            setStatusMessage('Saved offline - will sync automatically')
+            setStatus('complete')
+            
+            onCaptureComplete?.(capture.id)
+          }
           
           // Show next area prompt after a short delay
           setTimeout(() => {
             setShowNextAreaPrompt(true)
           }, 2000)
-
-          // Trigger sync if online
-          if (navigator.onLine) {
-            const syncManager = getSyncManager()
-            syncManager.processPendingCaptures()
-          }
 
         } catch (error) {
           console.error('Failed to save capture:', error)
