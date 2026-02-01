@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma'
 // GET /api/projects/[id]/items - Get all line items for a project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const projectId = params.id
+    const { id } = await params
+    const projectId = id
     
     const items = await prisma.line_items.findMany({
       where: {
