@@ -106,21 +106,29 @@ export async function POST(request: NextRequest) {
 
     console.log('Sync results:', results)
     
+    // ALWAYS return both formats for backwards compatibility
     // For single capture requests, return top-level lineItemId
     if (captures.length === 1 && results.lineItemIds.length > 0) {
       const { captureId, lineItemId } = results.lineItemIds[0]
       return NextResponse.json({
         success: true,
         captureId,
-        lineItemId,
-        lineItemIds: results.lineItemIds,
+        lineItemId, // Top-level for single captures
+        lineItemIds: results.lineItemIds, // Array for batch compatibility
+        synced: results.synced,
+        failed: results.failed,
+        errors: results.errors,
         serverTimestamp: new Date().toISOString(),
       })
     }
     
+    // For multiple captures, return array format
     return NextResponse.json({
       success: true,
-      ...results,
+      lineItemIds: results.lineItemIds, // Array format
+      synced: results.synced,
+      failed: results.failed,
+      errors: results.errors,
       serverTimestamp: new Date().toISOString(),
     })
   } catch (error) {

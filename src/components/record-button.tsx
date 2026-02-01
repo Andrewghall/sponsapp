@@ -298,12 +298,22 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             const syncData = await syncRes.json()
             console.log('Sync response:', syncData)
             
-            // The sync endpoint returns lineItemIds as an array
-            const lineItemIds = syncData?.lineItemIds as Array<{ captureId: string; lineItemId: string }> | undefined
-            const lineItem = lineItemIds?.find(m => m.captureId === captureId)
-            const lineItemId = lineItem?.lineItemId
+            // Handle both formats: top-level lineItemId OR lineItemIds array
+            let lineItemId: string | undefined
+            
+            // First try top-level lineItemId (for single captures)
+            if (syncData?.lineItemId) {
+              lineItemId = syncData.lineItemId
+              console.log('Using top-level lineItemId:', lineItemId)
+            }
+            // Fall back to lineItemIds array
+            else if (syncData?.lineItemIds && Array.isArray(syncData.lineItemIds)) {
+              const lineItem = syncData.lineItemIds.find((m: any) => m.captureId === captureId)
+              lineItemId = lineItem?.lineItemId
+              console.log('Found lineItemId in lineItemIds array:', lineItemId)
+            }
 
-            console.log('Found lineItemId:', { lineItemId, captureId, lineItemIds })
+            console.log('Final lineItemId:', { lineItemId, captureId })
 
             if (!lineItemId) {
               throw new Error('Sync did not return lineItemId for this capture')
