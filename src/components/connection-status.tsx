@@ -31,14 +31,21 @@ export function ConnectionStatusBar() {
       clearTimeout(timeoutId)
       
       if (response.status === 200 && navigator.onLine === true) {
-        // Online = navigator.onLine === true AND /api/health returns 200
+        // Online = browser online AND /api/health returns 200
         setConnectionStatus('online')
         backoffRef.current = 1000 // Reset backoff
         console.log('Network connectivity confirmed - online')
       } else {
-        // Any other status = offline (only if network request fails or navigator.onLine is false)
-        setConnectionStatus('offline')
-        console.log('Network check failed - offline')
+        // Non-200 status from /api/health = server error, NOT offline
+        // Only set offline if navigator.onLine is false
+        if (navigator.onLine === false) {
+          setConnectionStatus('offline')
+          console.log('Browser is offline - offline')
+        } else {
+          // Server is reachable but returned error - stay online for recording
+          setConnectionStatus('online')
+          console.log('Server error but network OK - staying online')
+        }
       }
     } catch (error) {
       // Only mark as offline for actual network errors (timeout/fetch failures)
