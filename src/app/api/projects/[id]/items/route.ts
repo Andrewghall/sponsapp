@@ -31,8 +31,8 @@ export async function GET(
     const transformedItems = items.map(item => ({
       id: item.id,
       status: item.status,
-      transcript: item.raw_transcript,
-      description: item.col_f_equipment_configuration || item.col_g_description, // Use observation_text first
+      transcript: item.col_f_equipment_configuration, // Use individual observation text, NOT raw_transcript
+      description: item.col_g_description,
       type: item.col_b_type,
       category: item.col_c_category,
       location: item.col_e_object,

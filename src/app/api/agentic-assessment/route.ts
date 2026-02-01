@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
             col_c_category: obs.location || '',
             col_d_parent: obs.trade,
             col_e_object: '',
-            col_f_equipment_configuration: obs.observation_text, // Use observation_text, not full transcript
+            col_f_equipment_configuration: obs.observation_text, // Store ONLY individual observation text
             col_g_description: obs.issue,
             col_h_equipment_present: 'EA',
             col_i_prefilled_data_correct: '0',
@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
             spons_candidate_label: null,
             spons_candidates: [],
             pass2_error_new: null,
+            // NO raw_transcript - only parent capture has full transcript
           },
         })
         childLineItems.push(childLineItem)
