@@ -153,22 +153,7 @@ export function RecordButton({
 
   return (
     <>
-      {/* Status Message - Fixed at absolute top */}
-      {statusMessage && (
-        <div className="fixed top-0 left-1/2 transform -translate-x-1/2 z-50">
-          <div className={cn(
-            "flex items-center gap-2 px-4 py-1 rounded-lg text-sm shadow-lg",
-            status === 'complete' && "bg-green-100 text-green-800",
-            status === 'error' && "bg-red-100 text-red-800",
-            status === 'processing' && "bg-blue-100 text-blue-800"
-          )}>
-            {status === 'complete' && <CheckCircle size={16} />}
-            {status === 'error' && <AlertCircle size={16} />}
-            {statusMessage}
-          </div>
-        </div>
-      )}
-
+      {/* Status Message - DISABLED to prevent black box issue */}
       <div className="flex flex-col items-center gap-6">
 
       {/* Recording Timer */}
