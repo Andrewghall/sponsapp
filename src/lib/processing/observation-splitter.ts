@@ -6,32 +6,61 @@ const openai = new OpenAI({
 
 interface Observation {
   asset_type: string
-  location: string
-  condition: string
-  full_observation: string
+  issue: string
+  location: string | null
+  attributes: {
+    size: string | null
+    rating: string | null
+    capacity_kw: number | null
+    phase: string | null
+    count: number | null
+    identifier: string | null
+  }
+  confidence: 'high' | 'medium' | 'low'
+}
+
+interface ObservationResponse {
+  observations: Observation[]
 }
 
 export async function splitTranscriptIntoObservations(transcript: string): Promise<Observation[]> {
-  const prompt = `You are a building surveyor assistant. Split the following transcript into distinct observations about building assets.
+  const prompt = `You are an extraction engine for building-condition survey notes. Your job is to convert a spoken inspection transcript into a clean list of discrete observations. Do not price, do not recommend repairs beyond what is stated, and do not guess. If something is unclear, set the field to null.
 
-For each observation, extract:
-1. Asset type (e.g., Door, Fire door, AHU, Boiler, Luminaire, Cable tray)
-2. Location (e.g., main entrance, basement corridor, plant, office, ceiling)
-3. Condition/issue (e.g., damaged, needs repair, making noise, requires servicing, flickering)
+Extract discrete inspection observations from the transcript below.
 
-Return ONLY a JSON array of observations with this exact structure:
-[
-  {
-    "asset_type": "Door",
-    "location": "main entrance", 
-    "condition": "timber frame damaged",
-    "full_observation": "Door – main entrance – timber frame damaged"
-  }
+Rules:
+•	Split into separate observations. One observation equals one asset or one defect event.
+•	If multiple issues refer to the same asset, keep them in one observation only if clearly the same asset.
+•	Keep wording short, factual, and survey-style.
+•	Do not invent locations, quantities, ratings, or sizes.
+•	Normalise units where possible (kW, mm, 600x600).
+•	If the transcript contains multiple assets in one sentence, still split.
+•	Output MUST be valid JSON only, no commentary.
+
+Output schema:
+{
+"observations": [
+{
+"asset_type": "string",
+"issue": "string",
+"location": "string|null",
+"attributes": {
+"size": "string|null",
+"rating": "string|null",
+"capacity_kw": "number|null",
+"phase": "string|null",
+"count": "number|null",
+"identifier": "string|null"
+},
+"confidence": "high|medium|low"
+}
 ]
+}
 
-Transcript: "${transcript}"
-
-Observations:`
+Transcript:
+<<<
+${transcript}
+<<<`
 
   try {
     const response = await openai.chat.completions.create({
@@ -46,26 +75,42 @@ Observations:`
       throw new Error('No response from OpenAI')
     }
 
-    const parsed = JSON.parse(content)
+    const parsed = JSON.parse(content) as ObservationResponse
     
     // Ensure we have an array
-    const observations = Array.isArray(parsed) ? parsed : (parsed.observations || [])
+    const observations = parsed.observations || []
     
     // Validate and clean each observation
-    return observations.map((obs: any) => ({
+    return observations.map((obs: Observation) => ({
       asset_type: obs.asset_type || 'Unknown',
-      location: obs.location || 'Unknown',
-      condition: obs.condition || 'Unknown',
-      full_observation: obs.full_observation || `${obs.asset_type || 'Unknown'} – ${obs.location || 'Unknown'} – ${obs.condition || 'Unknown'}`
+      issue: obs.issue || 'Unknown',
+      location: obs.location || null,
+      attributes: {
+        size: obs.attributes?.size || null,
+        rating: obs.attributes?.rating || null,
+        capacity_kw: obs.attributes?.capacity_kw || null,
+        phase: obs.attributes?.phase || null,
+        count: obs.attributes?.count || null,
+        identifier: obs.attributes?.identifier || null,
+      },
+      confidence: obs.confidence || 'medium'
     }))
   } catch (error) {
     console.error('Error splitting transcript:', error)
     // Fallback: treat entire transcript as one observation
     return [{
       asset_type: 'Unknown',
-      location: 'Unknown',
-      condition: transcript,
-      full_observation: transcript
+      issue: transcript,
+      location: null,
+      attributes: {
+        size: null,
+        rating: null,
+        capacity_kw: null,
+        phase: null,
+        count: null,
+        identifier: null,
+      },
+      confidence: 'low'
     }]
   }
 }

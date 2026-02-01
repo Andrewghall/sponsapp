@@ -78,15 +78,15 @@ export async function processPass2(lineItemId: string, traceId?: string): Promis
     ? `Extracted: ${rawQuantities.map(q => `${q.value} ${q.unit}`).join(', ')}`
     : undefined
 
-  // Build normalised data
+  // Build normalised data from structured observation fields
   const normalised = {
-    type: resolvedType,
-    category: resolvedCategory,
-    description: buildDescription(rawComponents, rawQuantities),
+    type: lineItem.col_b_type || resolveType(rawComponents),
+    category: lineItem.col_c_category || resolveCategory(rawComponents),
+    description: lineItem.col_g_description || buildDescription(rawComponents, rawQuantities),
     floor: locationInfo.floor,
-    location: locationInfo.location,
+    location: lineItem.col_e_object || locationInfo.location,
     assetCondition: condition,
-    observations: transcript,
+    observations: lineItem.col_g_description || transcript,
   }
 
   // Check mandatory fields

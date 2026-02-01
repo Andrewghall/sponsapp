@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
           raw_transcript: result.transcript,
           transcript_timestamp: new Date(),
           col_b_type: firstObservation.asset_type,
-          col_e_object: firstObservation.location,
-          col_g_description: firstObservation.condition,
+          col_e_object: firstObservation.location || undefined,
+          col_g_description: firstObservation.issue,
         },
       })
 
@@ -116,8 +116,8 @@ export async function POST(request: NextRequest) {
             raw_transcript: result.transcript,
             transcript_timestamp: new Date(),
             col_b_type: obs.asset_type,
-            col_e_object: obs.location,
-            col_g_description: obs.condition,
+            col_e_object: obs.location || undefined,
+            col_g_description: obs.issue,
           },
         })
 
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
           data: {
             line_item_id: newLineItem.id,
             action: 'TRANSCRIBED',
-            spoken_sentence: obs.full_observation,
+            spoken_sentence: `${obs.asset_type} - ${obs.issue}`,
           },
         })
 
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
         data: {
           line_item_id: lineItemId,
           action: 'TRANSCRIBED',
-          spoken_sentence: firstObservation.full_observation,
+          spoken_sentence: `${firstObservation.asset_type} - ${firstObservation.issue}`,
         },
       })
 
