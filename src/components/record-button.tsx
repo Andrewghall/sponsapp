@@ -249,9 +249,14 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             }
 
             const syncData = await syncRes.json()
-            const lineItemMap = syncData?.lineItemIds as Array<{ captureId: string; lineItemId: string }> | undefined
-            const lineItem = lineItemMap?.find(m => m.captureId === captureId)
+            console.log('Sync response:', syncData)
+            
+            // The sync endpoint returns lineItemIds as an array
+            const lineItemIds = syncData?.lineItemIds as Array<{ captureId: string; lineItemId: string }> | undefined
+            const lineItem = lineItemIds?.find(m => m.captureId === captureId)
             const lineItemId = lineItem?.lineItemId
+
+            console.log('Found lineItemId:', { lineItemId, captureId, lineItemIds })
 
             if (!lineItemId) {
               throw new Error('Sync did not return lineItemId for this capture')
@@ -263,11 +268,12 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             formData.append('captureId', captureId)
             formData.append('lineItemId', lineItemId)
 
-            console.log('Sending transcription request for:', { captureId, lineItemId })
+            console.log('Sending transcription request for:', { captureId, lineItemId, audioBlobSize: audioBlob.size })
             const res = await fetch('/api/deepgram/transcribe', {
               method: 'POST',
               body: formData,
             })
+            console.log('Transcription response status:', res.status)
 
             if (!res.ok) {
               const data = await res.json().catch(() => ({}))

@@ -31,12 +31,14 @@ export async function POST(request: NextRequest) {
       audioSize: audioFile?.size,
     })
 
-    // Convert to buffer
-    const arrayBuffer = await audioFile.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
     // Transcribe with Deepgram
-    const result = await transcribeAudio(buffer)
+    const audioBuffer = Buffer.from(await audioFile.arrayBuffer())
+    const result = await transcribeAudio(audioBuffer)
+    console.log('Transcription result:', result)
+      
+    if (!result || !result.transcript) {
+      throw new Error('Transcription failed: No transcript returned')
+    }
 
     // Update capture with transcript
     if (captureId) {
