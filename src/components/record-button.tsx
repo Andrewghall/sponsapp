@@ -40,6 +40,7 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
 
   // Poll for status updates after transcription
   const pollForStatus = useCallback(async (captureId: string) => {
+    console.log('🔥 RECORDING: Starting Pass 2 polling for:', captureId)
     let pollCount = 0
     const maxPolls = 20 // 20 seconds timeout
     
@@ -243,8 +244,10 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
 
         incrementPending()
 
+        console.log('🔥 RECORDING: Connection status is:', connectionStatus)
         if (connectionStatus === 'online') {
           try {
+            console.log('🔥 RECORDING: Starting online processing for capture:', captureId)
             onStatusChange?.('Uploading…')
 
             const audioBase64 = await new Promise<string>((resolveBase64, rejectBase64) => {
@@ -259,6 +262,7 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
               reader.readAsDataURL(audioBlob)
             })
 
+            console.log('🔥 RECORDING: Calling /api/sync...')
             const syncRes = await fetch('/api/sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -281,6 +285,8 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
                 ],
               }),
             })
+
+            console.log('🔥 RECORDING: /api/sync response status:', syncRes.status)
 
             if (!syncRes.ok) {
               const data = await syncRes.json().catch(() => ({}))
@@ -319,11 +325,12 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             formData.append('lineItemId', lineItemId)
 
             console.log('Sending transcription request for:', { captureId, lineItemId, audioBlobSize: audioBlob.size })
+            console.log('🔥 RECORDING: Calling /api/deepgram/transcribe...')
             const res = await fetch('/api/deepgram/transcribe', {
               method: 'POST',
               body: formData,
             })
-            console.log('Transcription response status:', res.status)
+            console.log('🔥 RECORDING: /api/deepgram/transcribe response status:', res.status)
 
             if (!res.ok) {
               const data = await res.json().catch(() => ({}))

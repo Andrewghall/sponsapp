@@ -24,9 +24,39 @@ export default function ProjectPage() {
     }
   }, [projectId, setCurrentProject])
 
-  const handleZoneChange = () => {
+  const handleZoneChange = async () => {
+    console.log('🔥 Zone creation handler started')
     if (isStoreReady) {
-      setCurrentZone('zone-1')
+      try {
+        console.log('🔥 Creating zone for project:', projectId)
+        
+        const response = await fetch(`/api/projects/${projectId}/zones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'Zone 1',
+            description: 'Demo zone created from UI'
+          })
+        })
+        
+        console.log('🔥 Zone creation response status:', response.status)
+        
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          console.error('🔥 Zone creation failed:', error)
+          alert(`Failed to create zone: ${error?.error || 'Unknown error'}`)
+          return
+        }
+        
+        const data = await response.json()
+        console.log('🔥 Zone created successfully:', data)
+        
+        setCurrentZone(data.zone.id)
+        alert('Zone created successfully!')
+      } catch (error) {
+        console.error('🔥 Zone creation error:', error)
+        alert(`Error creating zone: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
     }
   }
 
@@ -60,7 +90,10 @@ export default function ProjectPage() {
               <MapPin size={18} className="text-gray-500" />
               Current Zone
             </h2>
-            <button className="text-blue-600 text-sm font-medium">
+            <button 
+              onClick={handleZoneChange}
+              className="text-blue-600 text-sm font-medium"
+            >
               Change
             </button>
           </div>
