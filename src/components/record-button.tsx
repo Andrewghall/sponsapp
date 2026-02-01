@@ -355,7 +355,7 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
           onStatusChange?.('Saved offline (will sync later)')
         }
 
-        onCaptureComplete(captureId)
+        onCaptureComplete?.(captureId)
         resolve()
       }
 
