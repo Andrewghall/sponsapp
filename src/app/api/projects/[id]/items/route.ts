@@ -32,15 +32,18 @@ export async function GET(
       id: item.id,
       status: item.status,
       transcript: item.raw_transcript,
-      description: item.col_g_description,
+      description: item.col_f_equipment_configuration || item.col_g_description, // Use observation_text first
       type: item.col_b_type,
       category: item.col_c_category,
       location: item.col_e_object,
       floor: item.col_d_parent,
-      sponsCode: item.spons_matches?.[0]?.spons_items?.item_code,
-      sponsDescription: item.spons_matches?.[0]?.spons_items?.description,
+      sponsCode: item.spons_candidate_code || item.spons_matches?.[0]?.spons_items?.item_code,
+      sponsDescription: item.spons_candidate_label || item.spons_matches?.[0]?.spons_items?.description,
       sponsCost: item.spons_matches?.[0]?.spons_items?.rate,
       created_at: item.created_at,
+      pass2_status: item.pass2_status,
+      pass2_confidence: item.pass2_confidence,
+      source_capture_id: item.source_capture_id,
     }))
 
     return NextResponse.json({

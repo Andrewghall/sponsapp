@@ -148,6 +148,42 @@ export function LineCard({
               {[type, category].filter(Boolean).join(' • ')}
             </p>
           )}
+          
+          {/* Show SPONS match when available */}
+          {pass2_status === 'MATCHED' && (sponsCode || sponsDescription) && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+              <div className="flex items-center gap-1 text-green-700 font-medium">
+                <CheckCircle size={12} />
+                SPONS Match
+              </div>
+              {sponsCode && (
+                <p className="text-green-600 mt-1">Code: {sponsCode}</p>
+              )}
+              {sponsDescription && (
+                <p className="text-green-600">{sponsDescription}</p>
+              )}
+              {pass2_confidence && (
+                <p className="text-green-500 text-xs mt-1">
+                  Confidence: {Math.round(pass2_confidence * 100)}%
+                </p>
+              )}
+            </div>
+          )}
+          
+          {/* Show QS Review status */}
+          {pass2_status === 'QS_REVIEW' && (
+            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
+              <div className="flex items-center gap-1 text-amber-700 font-medium">
+                <AlertCircle size={12} />
+                Requires QS Review
+              </div>
+              {pass2_confidence && (
+                <p className="text-amber-600 text-xs mt-1">
+                  Confidence: {Math.round(pass2_confidence * 100)}%
+                </p>
+              )}
+            </div>
+          )}
         </div>
         {expanded ? (
           <ChevronUp size={20} className="text-gray-400 ml-2 flex-shrink-0" />

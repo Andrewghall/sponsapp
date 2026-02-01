@@ -43,21 +43,34 @@ export default function RecordPage() {
 
   // Add a function to update capture with Pass 2 results
   const handlePass2Complete = useCallback((captureId: string, data: any) => {
-    setRecentCaptures(prev =>
-      prev.map((c) => (c.id === captureId ? { 
-        ...c, 
-        status: data.status,
-        description: data.description,
-        type: data.type,
-        category: data.category,
-        location: data.location,
-        floor: data.floor,
-        sponsCode: data.sponsCode,
-        sponsDescription: data.sponsDescription,
-        sponsCost: data.sponsCost
-      } : c))
-    )
-  }, [])
+    console.log('Pass 2 complete:', data)
+    
+    // Update recent captures with the new items
+    if (data.items && Array.isArray(data.items)) {
+      const newItems = data.items.map((item: any) => ({
+        id: item.id,
+        status: item.status,
+        transcript: item.transcript,
+        description: item.description,
+        type: item.type,
+        category: item.category,
+        location: item.location,
+        floor: item.floor,
+        sponsCode: item.spons_candidate_code,
+        sponsDescription: item.spons_candidate_label,
+        sponsCost: null, // Would need to be calculated from rate * quantity
+        pass2_status: item.pass2_status,
+        pass2_confidence: item.pass2_confidence,
+      }))
+      
+      setRecentCaptures(prev => [...newItems, ...prev].slice(0, 10))
+      
+      // Navigate to items page to show results
+      setTimeout(() => {
+        router.push(`/projects/${projectId}/items`)
+      }, 1000)
+    }
+  }, [projectId, router])
 
   return (
     <div className="min-h-screen flex flex-col">

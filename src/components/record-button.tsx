@@ -59,7 +59,15 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
           } else if (data.state === 'COMPLETE') {
             clearInterval(pollInterval)
             setRecordingStatus('idle')
-            onStatusChange?.('Ready')
+            onStatusChange?.('Complete')
+            
+            // Call Pass 2 complete callback with the data
+            if (onPass2Complete && data.items && data.items.length > 0) {
+              onPass2Complete(captureId, {
+                items: data.items,
+                state: data.state
+              })
+            }
             
             // Refresh items list to show all observations
             router.refresh()
