@@ -134,12 +134,21 @@ export async function POST(request: NextRequest) {
         
         // Retrieve SPONS candidates
         const candidates = await retrieveCandidates(
-          `${lineItem.col_b_type || ''} ${lineItem.col_g_description || ''} ${lineItem.col_e_object || ''}`,
+          lineItem.id,
+          {
+            type: lineItem.col_b_type || '',
+            category: lineItem.col_c_category || '',
+            description: lineItem.col_g_description || '',
+            floor: '',
+            location: lineItem.col_e_object || '',
+            assetCondition: undefined,
+            observations: observationText,
+          },
           traceId
         )
         
         // Calculate confidence (simple heuristic based on similarity score)
-        const confidence = candidates.length > 0 ? Math.min(0.99, (candidates[0] as any).similarity * 100 || 0.5) : 0
+        const confidence = candidates.length > 0 ? Math.min(0.99, candidates[0].similarity_score * 100 || 0.5) : 0
         
         // Determine status
         const status = confidence >= 0.75 ? 'MATCHED' : 'QS_REVIEW'
