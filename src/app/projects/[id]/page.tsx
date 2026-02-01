@@ -25,11 +25,8 @@ export default function ProjectPage() {
   }, [projectId, setCurrentProject])
 
   const handleZoneChange = async () => {
-    console.log('🔥 Zone creation handler started')
     if (isStoreReady) {
       try {
-        console.log('🔥 Creating zone for project:', projectId)
-        
         const response = await fetch(`/api/projects/${projectId}/zones`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -39,22 +36,16 @@ export default function ProjectPage() {
           })
         })
         
-        console.log('🔥 Zone creation response status:', response.status)
-        
         if (!response.ok) {
           const error = await response.json().catch(() => ({}))
-          console.error('🔥 Zone creation failed:', error)
           alert(`Failed to create zone: ${error?.error || 'Unknown error'}`)
           return
         }
         
         const data = await response.json()
-        console.log('🔥 Zone created successfully:', data)
-        
         setCurrentZone(data.zone.id)
         alert('Zone created successfully!')
       } catch (error) {
-        console.error('🔥 Zone creation error:', error)
         alert(`Error creating zone: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
