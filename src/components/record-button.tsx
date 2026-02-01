@@ -292,7 +292,7 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             
             if (transcript) {
               setLiveTranscript(transcript)
-              onStatusChange?.('Saved')
+              onStatusChange?.('Capture saved successfully')
               onCaptureCompleteWithTranscript?.(captureId, transcript)
               
               // Clear processing state
@@ -309,7 +309,7 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
                 pollForStatus(captureId)
               }, 2000)
             } else {
-              onStatusChange?.('Saved (no transcript)')
+              onStatusChange?.('Capture saved (no transcript)')
               
               // Clear processing state
               setRecordingStatus('idle')

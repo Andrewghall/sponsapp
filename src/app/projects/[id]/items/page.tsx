@@ -33,6 +33,17 @@ export default function ItemsPage() {
     fetchItems()
   }, [projectId])
 
+  // Re-fetch when page becomes visible (after navigation)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchItems()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [projectId])
+
   const fetchItems = async () => {
     try {
       setLoading(true)
