@@ -51,26 +51,27 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
         if (response.ok) {
           const data = await response.json()
           
-          // Check for completion or error
-          if (data.status === 'PASS2_COMPLETE' || data.status === 'PENDING_QS_REVIEW' || data.status === 'APPROVED') {
+          // Update status based on state
+          if (data.state === 'PLANNING') {
+            onStatusChange?.('Planning inspection…')
+          } else if (data.state === 'MATCHING') {
+            onStatusChange?.('Matching assets…')
+          } else if (data.state === 'COMPLETE') {
             clearInterval(pollInterval)
             setRecordingStatus('idle')
             onStatusChange?.('Ready')
             
-            // Call Pass 2 complete callback with data
-            onPass2Complete?.(captureId, data)
-            
-            // Refresh items list to show Pass 2 results
+            // Refresh items list to show all observations
             router.refresh()
             
             // Optionally navigate to items page
             // router.push(`/projects/${projectId}/items`)
-          } else if (data.pass2_error || pollCount >= maxPolls) {
+          } else if (data.state === 'FAILED' || pollCount >= maxPolls) {
             clearInterval(pollInterval)
             setRecordingStatus('idle')
-            onStatusChange?.('Saved, needs review')
+            onStatusChange?.('Assessment failed')
             
-            // Still refresh items so user sees the new row
+            // Still refresh items so user sees the results
             router.refresh()
           }
         }

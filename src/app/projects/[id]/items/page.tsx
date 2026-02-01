@@ -19,6 +19,9 @@ interface LineItem {
   sponsDescription?: string
   sponsCost?: number
   created_at?: string
+  pass2_status?: string
+  pass2_confidence?: number
+  source_capture_id?: string
 }
 
 export default function ItemsPage() {
@@ -151,7 +154,9 @@ export default function ItemsPage() {
                 sponsCode={item.sponsCode}
                 sponsDescription={item.sponsDescription}
                 sponsCost={item.sponsCost}
-                onEdit={() => router.push(`/projects/${projectId}/items/${item.id}/edit`)}
+                onEdit={() => console.log('Edit item:', item)}
+                pass2_status={item.pass2_status}
+                pass2_confidence={item.pass2_confidence}
               />
             ))}
           </div>

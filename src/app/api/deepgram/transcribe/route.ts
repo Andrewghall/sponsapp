@@ -153,17 +153,21 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Trigger Pass 2 for first line item
-      console.log('Triggering async Pass 2 for line item:', lineItemId)
+      // Trigger Agentic Assessment
+      console.log('Triggering agentic assessment for capture:', captureId)
       try {
         const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
-        fetch(`${base}/api/pass2`, {
+        fetch(`${base}/api/agentic-assessment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lineItemId }),
-        }).catch(err => console.error('Failed to trigger Pass 2:', err))
+          body: JSON.stringify({ 
+            projectId: originalLineItem.project_id,
+            captureId,
+            transcript: result.transcript 
+          }),
+        }).catch(err => console.error('Failed to trigger agentic assessment:', err))
       } catch (error) {
-        console.error('Error triggering Pass 2:', error)
+        console.error('Error triggering agentic assessment:', error)
       }
     }
 

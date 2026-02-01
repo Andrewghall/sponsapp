@@ -8,6 +8,7 @@ interface Observation {
   asset_type: string
   issue: string
   location: string | null
+  trade: 'Fire' | 'HVAC' | 'Mechanical' | 'Electrical' | 'General'
   attributes: {
     size: string | null
     rating: string | null
@@ -44,6 +45,7 @@ Output schema:
 "asset_type": "string",
 "issue": "string",
 "location": "string|null",
+"trade": "Fire|HVAC|Mechanical|Electrical|General",
 "attributes": {
 "size": "string|null",
 "rating": "string|null",
@@ -85,6 +87,7 @@ ${transcript}
       asset_type: obs.asset_type || 'Unknown',
       issue: obs.issue || 'Unknown',
       location: obs.location || null,
+      trade: obs.trade || 'General',
       attributes: {
         size: obs.attributes?.size || null,
         rating: obs.attributes?.rating || null,
@@ -102,6 +105,7 @@ ${transcript}
       asset_type: 'Unknown',
       issue: transcript,
       location: null,
+      trade: 'General',
       attributes: {
         size: null,
         rating: null,

@@ -85,8 +85,6 @@ model line_items {
   project_id                    String
   zone_id                       String?
   status                        line_item_status? @default(PENDING_PASS1)
-  pass2_error                   String?
-  pass2_completed_at            DateTime?         @db.Timestamptz(6)
   col_b_type                    String?
   col_c_category                String?
   col_d_parent                  String?
@@ -122,6 +120,15 @@ model line_items {
   unit_conversion_logic         String?
   created_at                    DateTime?         @default(now()) @db.Timestamptz(6)
   updated_at                    DateTime?         @default(now()) @db.Timestamptz(6)
+  pass2_completed_at            DateTime?         @db.Timestamptz(6)
+  pass2_error                   String?
+  pass2_confidence              Decimal?          @db.Decimal(3, 2)
+  pass2_error_new               String?
+  pass2_status                  String?           @default("PENDING")
+  source_capture_id             String?
+  spons_candidate_code          String?
+  spons_candidate_label         String?
+  spons_candidates              Json?
   audit_entries                 audit_entries[]
   captures                      captures[]
   projects                      projects          @relation(fields: [project_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -231,12 +238,12 @@ enum line_item_status {
   PASS1_COMPLETE
   PENDING_PASS2
   PASS2_COMPLETE
-  PASS2_ERROR
   PENDING_SPONS
   UNMATCHED
   PENDING_QS_REVIEW
   APPROVED
   EXPORTED
+  PASS2_ERROR
 }
 
 enum sheet_type {

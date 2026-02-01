@@ -16,6 +16,8 @@ interface LineCardProps {
   sponsDescription?: string
   sponsCost?: number
   onEdit?: () => void
+  pass2_status?: string
+  pass2_confidence?: number
 }
 
 interface Candidate {
@@ -53,6 +55,8 @@ export function LineCard({
   sponsDescription,
   sponsCost,
   onEdit,
+  pass2_status,
+  pass2_confidence,
 }: LineCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [candidates, setCandidates] = useState<Candidate[]>([])
@@ -87,16 +91,26 @@ export function LineCard({
     }
   }
 
-  const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
-    PENDING_PASS1: { icon: Clock, color: 'text-gray-400', label: 'Processing...' },
-    PASS1_COMPLETE: { icon: Clock, color: 'text-blue-500', label: 'Normalising...' },
-    PENDING_PASS2: { icon: Clock, color: 'text-blue-500', label: 'Normalising...' },
-    PASS2_COMPLETE: { icon: Clock, color: 'text-amber-500', label: 'Matching SPONS...' },
-    PENDING_SPONS: { icon: Clock, color: 'text-amber-500', label: 'Matching SPONS...' },
+  const statusConfig: Record<string, { icon: any; color: string; label: string }> = {
+    PENDING_PASS1: { icon: Clock, color: 'text-gray-500', label: 'Pending' },
+    PASS1_COMPLETE: { icon: Clock, color: 'text-blue-500', label: 'Transcribed' },
+    PENDING_PASS2: { icon: Clock, color: 'text-blue-500', label: 'Matching' },
+    PASS2_COMPLETE: { icon: CheckCircle, color: 'text-green-500', label: 'Matched' },
+    PASS2_ERROR: { icon: AlertCircle, color: 'text-red-500', label: 'Error' },
+    PENDING_SPONS: { icon: Clock, color: 'text-amber-500', label: 'SPONS Pending' },
     UNMATCHED: { icon: AlertCircle, color: 'text-red-500', label: 'Unmatched' },
     PENDING_QS_REVIEW: { icon: AlertCircle, color: 'text-amber-500', label: 'QS Review' },
     APPROVED: { icon: CheckCircle, color: 'text-green-500', label: 'Approved' },
     EXPORTED: { icon: CheckCircle, color: 'text-green-600', label: 'Exported' },
+  }
+
+  const pass2StatusConfig: Record<string, { color: string; label: string }> = {
+    PENDING: { color: 'text-gray-500', label: 'Pending' },
+    PLANNING: { color: 'text-blue-500', label: 'Planning' },
+    MATCHING: { color: 'text-amber-500', label: 'Matching' },
+    MATCHED: { color: 'text-green-500', label: 'Matched' },
+    QS_REVIEW: { color: 'text-amber-600', label: 'QS Review' },
+    FAILED: { color: 'text-red-500', label: 'Failed' },
   }
 
   const config = statusConfig[status] || statusConfig.PENDING_PASS1
@@ -112,6 +126,19 @@ export function LineCard({
           <div className="flex items-center gap-2 mb-1">
             <StatusIcon size={16} className={config.color} />
             <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
+            {pass2_status && pass2_status !== 'PENDING' && (
+              <>
+                <span className="text-gray-300">•</span>
+                <span className={`text-xs font-medium ${pass2StatusConfig[pass2_status]?.color || 'text-gray-500'}`}>
+                  {pass2StatusConfig[pass2_status]?.label || pass2_status}
+                </span>
+                {pass2_confidence && (
+                  <span className="text-xs text-gray-400">
+                    ({Math.round(pass2_confidence * 100)}%)
+                  </span>
+                )}
+              </>
+            )}
           </div>
           <p className="text-sm text-gray-900 truncate">
             {description || transcript || 'Processing...'}
