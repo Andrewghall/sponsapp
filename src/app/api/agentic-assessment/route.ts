@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
             pass2_confidence: confidence,
             spons_candidate_code: candidates.length > 0 ? candidates[0].item_code : null,
             spons_candidate_label: candidates.length > 0 ? candidates[0].description : null,
-            spons_candidates: candidates.length > 0 ? candidates.slice(0, 5) : null,
+            spons_candidates: candidates.slice(0, 5),
           },
         })
         
