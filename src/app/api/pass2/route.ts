@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
     await prisma.line_items.update({
       where: { id: lineItemId },
       data: { 
-        status: 'PENDING_PASS2'
+        status: 'PENDING_PASS2',
+        pass2_error: null,
+        pass2_completed_at: null
       }
     })
     
@@ -38,7 +40,9 @@ export async function POST(request: NextRequest) {
       await prisma.line_items.update({
         where: { id: lineItemId },
         data: { 
-          status: result.status
+          status: result.status,
+          pass2_completed_at: new Date(),
+          pass2_error: null
         }
       })
       
@@ -66,11 +70,13 @@ export async function POST(request: NextRequest) {
         }
       })
       
-      // Update status to error (using PENDING_PASS2 for now since schema not updated)
+      // Update status to error
       await prisma.line_items.update({
         where: { id: lineItemId },
         data: { 
-          status: 'PENDING_PASS2'
+          status: 'PASS2_ERROR',
+          pass2_error: errorMessage,
+          pass2_completed_at: new Date()
         }
       })
       
