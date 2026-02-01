@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { splitTranscriptIntoObservations } from '@/lib/processing/observation-splitter'
+import { processObservationsPipeline } from '@/lib/processing/observation-pipeline'
 import { runCompleteAgenticLoop } from '@/lib/processing/execution-loop'
 import { normalizeTranscript, detectMultipleAssets } from '@/lib/processing/agentic-matcher'
 import { v4 as uuidv4 } from 'uuid'
@@ -102,49 +103,52 @@ export async function POST(request: NextRequest) {
     const hasMultipleAssets = await detectMultipleAssets(normalizedTranscript)
     console.log(`[${traceId}] Multiple assets detected:`, hasMultipleAssets)
     
-    // Split into observations
-    const observations = await splitTranscriptIntoObservations(normalizedTranscript)
+    // Step 2: Split transcript into observations
+    console.log(`[${traceId}] Step 2: Splitting transcript into observations`)
+    const observations = await splitTranscriptIntoObservations(normalizedTranscript, traceId)
     console.log(`[${traceId}] Split into ${observations.length} observations`)
     
-    // Create child line items for each observation
+    // Step 3: Process observations pipeline - clean, deduplicate, infer quantities
+    console.log(`[${traceId}] Step 3: Processing observations pipeline`)
+    const processedObservations = await processObservationsPipeline(normalizedTranscript, observations, traceId)
+    console.log(`[${traceId}] Processed to ${processedObservations.length} final observations`)
+    
+    // Step 4: Create child line items for each processed observation
+    console.log(`[${traceId}] Step 4: Creating child line items`)
     const childLineItems = []
-    for (let i = 0; i < observations.length; i++) {
-      const obs = observations[i]
-      
-      // Check if already exists (idempotent)
-      const existing = await prisma.line_items.findFirst({
-        where: {
-          project_id: projectId,
-          col_b_type: obs.asset_type,
-          col_e_object: obs.location,
-          col_g_description: obs.issue,
-          raw_transcript: transcript
-        }
-      })
-      
-      if (!existing) {
-        const childItem = await prisma.line_items.create({
+    
+    for (const obs of processedObservations) {
+      try {
+        const childLineItem = await prisma.line_items.create({
           data: {
-            project_id: originalLineItem.project_id,
-            zone_id: originalLineItem.zone_id,
-            status: 'PASS1_COMPLETE',
-            source_capture_id: captureId,
-            pass2_status: 'PLANNING',
+            project_id: projectId,
+            col_a_item: obs.asset_type,
             col_b_type: obs.asset_type,
-            col_e_object: obs.location,
+            col_c_location: obs.location || '',
+            col_d_trade: obs.trade,
+            col_e_code: '',
+            col_f_description: obs.observation_text, // Use observation_text, not full transcript
             col_g_description: obs.issue,
-            col_c_category: obs.trade,
-            raw_transcript: transcript,
-            transcript_timestamp: new Date(),
+            col_h_unit: 'EA',
+            col_i_rate: 0,
+            col_j_quantity: obs.quantity, // Use inferred quantity
+            col_k_amount: 0,
+            status: 'PASS_2',
+            pass2_status: 'PENDING',
+            pass2_confidence: 0,
+            spons_candidate_code: null,
+            spons_candidate_label: null,
+            spons_candidates: [],
+            pass2_error_new: null,
           },
         })
-        childLineItems.push(childItem)
-      } else {
-        childLineItems.push(existing)
+        childLineItems.push(childLineItem)
+        console.log(`[${traceId}] Created line item: ${childLineItem.id} - ${obs.asset_type} (qty: ${obs.quantity})`)
+      } catch (error) {
+        console.error(`[${traceId}] Failed to create line item for ${obs.asset_type}:`, error)
       }
     }
     
-    // Step 2: Agentic Matching - Run intelligent matching with retries
     console.log(`[${traceId}] Step 2: Agentic Matching - Processing ${childLineItems.length} observations`)
     
     // Update all to MATCHING status
