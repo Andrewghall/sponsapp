@@ -97,8 +97,8 @@ export async function POST(request: NextRequest) {
       console.log('Triggering async Pass 2 for line item:', lineItemId)
       try {
         // Fire and forget - don't await
-        const base = process.env.NEXT_PUBLIC_SITE_URL ?? `https://${process.env.VERCEL_URL}`
-        fetch(`${base}/api/pass2`, {
+        const origin = new URL(request.url).origin
+        fetch(`${origin}/api/pass2`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ lineItemId }),
