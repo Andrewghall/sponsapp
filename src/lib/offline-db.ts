@@ -1,14 +1,27 @@
 import { openDB, IDBPDatabase } from 'idb'
 
+interface CaptureContext {
+  zone: string
+  level: string
+  room: string
+}
+
 interface OfflineCapture {
   id: string
   idempotencyKey: string
+  projectId: string
+  context: CaptureContext
   audioBlob: Blob
+  audioLocalUri: string
+  audioMimeType: string
+  audioSize: number
   audioDuration: number
   timestamp: Date
-  projectId: string
-  zoneId?: string
-  synced: boolean
+  syncStatus: 'PENDING' | 'UPLOADING' | 'TRANSCRIBING' | 'SPLITTING' | 'MATCHING' | 'COMPLETE' | 'FAILED'
+  retryCount: number
+  lastError?: string
+  transcript?: string  // Full transcript (parent)
+  lineItemIds?: string[]  // Child line items
 }
 
 interface PendingSyncItem {
@@ -32,8 +45,9 @@ export async function getOfflineDb() {
       // Captures store for offline audio
       if (!db.objectStoreNames.contains('captures')) {
         const captureStore = db.createObjectStore('captures', { keyPath: 'id' })
-        captureStore.createIndex('by-synced', 'synced')
         captureStore.createIndex('by-project', 'projectId')
+        captureStore.createIndex('by-syncStatus', 'syncStatus')
+        captureStore.createIndex('by-timestamp', 'timestamp')
       }
 
       // Pending sync queue
@@ -56,16 +70,25 @@ export async function saveOfflineCapture(capture: OfflineCapture) {
 export async function getUnsyncedCaptures(): Promise<OfflineCapture[]> {
   const db = await getOfflineDb()
   const tx = db.transaction('captures', 'readonly')
-  const index = tx.store.index('by-synced')
-  return index.getAll(IDBKeyRange.only(false)) as Promise<OfflineCapture[]>
+  const store = tx.store
+  const allCaptures = await store.getAll() as OfflineCapture[]
+  return allCaptures.filter(capture => capture.syncStatus === 'PENDING' || capture.syncStatus === 'FAILED')
 }
 
-// Mark capture as synced
-export async function markCaptureSynced(id: string) {
+// Update capture sync status
+export async function updateCaptureSyncStatus(
+  captureId: string, 
+  status: OfflineCapture['syncStatus'], 
+  error?: string
+): Promise<void> {
   const db = await getOfflineDb()
-  const capture = await db.get('captures', id) as OfflineCapture | undefined
+  const capture = await db.get('captures', captureId) as OfflineCapture | undefined
   if (capture) {
-    capture.synced = true
+    capture.syncStatus = status
+    if (error) {
+      capture.lastError = error
+      capture.retryCount += 1
+    }
     await db.put('captures', capture)
   }
 }
@@ -83,7 +106,7 @@ export async function cleanupOldCaptures() {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
   for (const capture of allCaptures) {
-    if (capture.synced && new Date(capture.timestamp) < sevenDaysAgo) {
+    if (capture.syncStatus === 'COMPLETE' && new Date(capture.timestamp) < sevenDaysAgo) {
       await db.delete('captures', capture.id)
     }
   }
@@ -112,4 +135,50 @@ export async function getPendingSyncItems(): Promise<PendingSyncItem[]> {
 export async function removeFromSyncQueue(id: string) {
   const db = await getOfflineDb()
   await db.delete('pendingSync', id)
+}
+
+// Export types for use in components
+export type { OfflineCapture, CaptureContext }
+export type SyncStatus = OfflineCapture['syncStatus']
+
+// Helper function to create a new capture
+export async function createOfflineCapture(
+  projectId: string,
+  context: CaptureContext,
+  audioBlob: Blob,
+  audioDuration: number
+): Promise<OfflineCapture> {
+  const capture: OfflineCapture = {
+    id: crypto.randomUUID(),
+    idempotencyKey: crypto.randomUUID(),
+    projectId,
+    context,
+    audioBlob,
+    audioLocalUri: `capture_${Date.now()}.webm`,
+    audioMimeType: audioBlob.type,
+    audioSize: audioBlob.size,
+    audioDuration,
+    timestamp: new Date(),
+    syncStatus: 'PENDING',
+    retryCount: 0,
+  }
+  
+  await saveOfflineCapture(capture)
+  return capture
+}
+
+// Get captures by project
+export async function getCapturesByProject(projectId: string): Promise<OfflineCapture[]> {
+  const db = await getOfflineDb()
+  const tx = db.transaction('captures', 'readonly')
+  const index = tx.store.index('by-project')
+  return index.getAll(projectId) as Promise<OfflineCapture[]>
+}
+
+// Get captures by sync status
+export async function getCapturesByStatus(status: OfflineCapture['syncStatus']): Promise<OfflineCapture[]> {
+  const db = await getOfflineDb()
+  const tx = db.transaction('captures', 'readonly')
+  const index = tx.store.index('by-syncStatus')
+  return index.getAll(status) as Promise<OfflineCapture[]>
 }

@@ -248,8 +248,16 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
           audioDuration: duration,
           timestamp: new Date(),
           projectId,
-          zoneId,
-          synced: false,
+          context: {
+            zone: zoneId || '',
+            level: '',
+            room: ''
+          },
+          audioLocalUri: `capture_${Date.now()}.webm`,
+          audioMimeType: audioBlob.type,
+          audioSize: audioBlob.size,
+          syncStatus: 'PENDING',
+          retryCount: 0,
         })
 
         incrementPending()
@@ -282,8 +290,12 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
                     audioDuration: duration,
                     timestamp: new Date().toISOString(),
                     projectId,
-                    zoneId,
                     transcript: '',
+                    context: {
+                      zone: zoneId || '',
+                      level: '',
+                      room: ''
+                    }
                   },
                 ],
               }),
