@@ -63,12 +63,16 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
   // 2. Vector similarity on description (if embedding exists)
   const candidates: RetrievedCandidate[] = []
   if (normalized.description) {
+    // Get compatible units as PostgreSQL array
+    const compatibleUnitsArray = compatibleUnits(normalized.unit)
+    console.log('Compatible units array:', compatibleUnitsArray)
+    
     // Build parameterized query
     const queryParams: any[] = []
     let paramIndex = 1
     
-    let whereClause = 'unit = ANY($' + paramIndex + ')'
-    queryParams.push(compatibleUnits(normalized.unit))
+    let whereClause = 'unit = ANY($' + paramIndex + '::text[])'
+    queryParams.push(compatibleUnitsArray)
     paramIndex++
     
     if (normalized.trade) {
@@ -78,6 +82,9 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
     }
     
     whereClause += ' AND embedding IS NOT NULL'
+    
+    console.log('SQL where clause:', whereClause)
+    console.log('SQL params:', queryParams)
     
     const similarityResults = await prisma.$queryRaw<Array<{
       id: string
