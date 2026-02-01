@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+
+export const runtime = 'nodejs'
 import { processPass2 } from '@/lib/processing/pass2'
 import { v4 as uuidv4 } from 'uuid'
 

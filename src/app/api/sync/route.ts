@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+
+export const runtime = 'nodejs'
 
 // POST /api/sync - Sync offline captures to server
 export async function POST(request: NextRequest) {
@@ -50,7 +52,10 @@ export async function POST(request: NextRequest) {
         // Upload audio to Supabase Storage
         let audioUrl = null
         if (capture.audioBase64) {
-          const supabase = await createClient()
+          const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          )
           const audioBuffer = Buffer.from(capture.audioBase64, 'base64')
           const fileName = `${capture.id}.webm`
           

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+
+export const runtime = 'nodejs'
 import { runAgentSelection } from '@/lib/processing/agent'
 
 // POST /api/spons/agent-select - Run agentic LLM selection on retrieved candidates

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+
+export const runtime = 'nodejs'
 import { createClient } from '@/lib/supabase/server'
 import { splitTranscriptIntoObservations } from '@/lib/processing/observation-splitter'
 import { processObservationsPipeline } from '@/lib/processing/observation-pipeline'

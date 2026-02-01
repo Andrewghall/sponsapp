@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import ExcelJS from 'exceljs'
 
+export const runtime = 'nodejs'
+
 // LCY3 Column mapping - exact match to spreadsheet
 const LCY3_COLUMNS = [
   { col: 'B', field: 'colB_type', header: 'Type' },

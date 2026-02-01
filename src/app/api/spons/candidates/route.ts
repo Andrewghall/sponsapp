@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const runtime = 'nodejs'
+
 // GET /api/spons/candidates?lineItemId=xxx - Fetch candidates and agent decision for a line item
 export async function GET(request: NextRequest) {
   try {

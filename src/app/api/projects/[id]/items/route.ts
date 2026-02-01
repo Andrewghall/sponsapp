@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const runtime = 'nodejs'
+
 // GET /api/projects/[id]/items - Get all line items for a project
 export async function GET(
   request: NextRequest,

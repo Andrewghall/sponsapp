@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { Deepgram } from '@deepgram/sdk'
 import { prisma } from '@/lib/prisma'
-import { createClient } from '@/lib/supabase/server'
 import { splitTranscriptIntoObservations } from '@/lib/processing/observation-splitter'
 import { processPass2 } from '@/lib/processing/pass2'
 import { transcribeAudio } from '@/lib/deepgram'
+
+export const runtime = 'nodejs'
 
 // POST /api/deepgram/transcribe - Batch transcription for offline audio
 export async function POST(request: NextRequest) {
