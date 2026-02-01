@@ -64,7 +64,7 @@ export default function CapturePage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <Link
-              href={`/projects/select`}
+              href="/"
               className="p-2 -ml-2 text-gray-600 hover:text-gray-900"
             >
               <ArrowLeft size={24} />
