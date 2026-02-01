@@ -2,21 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { splitTranscriptIntoObservations } from '@/lib/processing/observation-splitter'
-import { retrieveCandidates } from '@/lib/processing/retrieval'
+import { processObservationsAgentic } from '@/lib/processing/agentic-matcher'
+import { normalizeTranscript, detectMultipleAssets } from '@/lib/processing/agentic-matcher'
 import { v4 as uuidv4 } from 'uuid'
-
-// Import generateEmbedding from retrieval
-async function generateEmbedding(text: string): Promise<number[]> {
-  const OpenAI = require('openai')
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: text,
-  })
-  
-  return response.data[0].embedding
-}
 
 interface AssessmentRequest {
   projectId: string
@@ -68,10 +56,18 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Step 1: Planning - Split transcript into observations
-    console.log(`[${traceId}] Step 1: Planning - Splitting transcript into observations`)
+    // Step 1: Planning - Normalize and split transcript
+    console.log(`[${traceId}] Step 1: Planning - Normalizing transcript`)
     
-    const observations = await splitTranscriptIntoObservations(transcript)
+    const normalizedTranscript = await normalizeTranscript(transcript)
+    console.log(`[${traceId}] Normalized transcript:`, normalizedTranscript)
+    
+    // Check if multiple assets present
+    const hasMultipleAssets = await detectMultipleAssets(normalizedTranscript)
+    console.log(`[${traceId}] Multiple assets detected:`, hasMultipleAssets)
+    
+    // Split into observations
+    const observations = await splitTranscriptIntoObservations(normalizedTranscript)
     console.log(`[${traceId}] Split into ${observations.length} observations`)
     
     // Create child line items for each observation
@@ -112,8 +108,8 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Step 2: Matching - Run SPONS matching for each observation
-    console.log(`[${traceId}] Step 2: Matching - Running SPONS matching for ${childLineItems.length} observations`)
+    // Step 2: Agentic Matching - Run intelligent matching with retries
+    console.log(`[${traceId}] Step 2: Agentic Matching - Processing ${childLineItems.length} observations`)
     
     // Update all to MATCHING status
     await prisma.line_items.updateMany({
@@ -121,58 +117,26 @@ export async function POST(request: NextRequest) {
       data: { pass2_status: 'MATCHING' }
     })
     
-    // Process each observation
+    // Process each observation with agentic matcher
     for (const lineItem of childLineItems) {
       try {
         console.log(`[${traceId}] Processing observation: ${lineItem.col_b_type} - ${lineItem.col_g_description}`)
         
-        // Build observation text for embedding
-        const observationText = `${lineItem.col_b_type}. ${lineItem.col_g_description}. Location: ${lineItem.col_e_object || 'Unknown'}.`
-        
-        // Generate embedding
-        const embedding = await generateEmbedding(observationText)
-        
-        // Retrieve SPONS candidates
-        const candidates = await retrieveCandidates(
-          lineItem.id,
-          {
-            type: lineItem.col_b_type || '',
-            category: lineItem.col_c_category || '',
-            description: lineItem.col_g_description || '',
-            floor: '',
-            location: lineItem.col_e_object || '',
-            assetCondition: undefined,
-            observations: observationText,
-          },
-          traceId
+        // Find the corresponding observation
+        const observation = observations.find(
+          obs => obs.asset_type === lineItem.col_b_type && 
+                 obs.issue === lineItem.col_g_description
         )
         
-        // Calculate confidence (simple heuristic based on similarity score)
-        const confidence = candidates.length > 0 ? Math.min(0.99, candidates[0].similarity_score * 100 || 0.5) : 0
+        if (!observation) {
+          console.error(`[${traceId}] No matching observation found for line item ${lineItem.id}`)
+          continue
+        }
         
-        // Map candidates to plain JSON for Prisma
-        const candidatesJson = candidates.slice(0, 5).map(c => ({
-          item_code: String(c.item_code),
-          description: String(c.description ?? ""),
-          score: Number(c.similarity_score ?? 0)
-        }))
+        // Run agentic matching with retries
+        const results = await processObservationsAgentic([observation], lineItem.id, traceId)
         
-        // Determine status
-        const status = confidence >= 0.75 ? 'MATCHED' : 'QS_REVIEW'
-        
-        // Update line item with results
-        await prisma.line_items.update({
-          where: { id: lineItem.id },
-          data: {
-            pass2_status: status,
-            pass2_confidence: confidence,
-            spons_candidate_code: candidates.length > 0 ? candidates[0].item_code : null,
-            spons_candidate_label: candidates.length > 0 ? candidates[0].description : null,
-            spons_candidates: candidatesJson,
-          },
-        })
-        
-        console.log(`[${traceId}] Completed observation: ${status} (confidence: ${confidence})`)
+        console.log(`[${traceId}] Completed observation: ${results[0]?.spons_code || 'NO MATCH'} (confidence: ${results[0]?.confidence})`)
         
       } catch (error) {
         console.error(`[${traceId}] Error processing observation ${lineItem.id}:`, error)
@@ -182,7 +146,7 @@ export async function POST(request: NextRequest) {
           where: { id: lineItem.id },
           data: {
             pass2_status: 'FAILED',
-            pass2_error_new: error instanceof Error ? error.message : String(error),
+            pass2_error_new: error instanceof Error ? error.message : 'Unknown error',
           },
         })
       }
