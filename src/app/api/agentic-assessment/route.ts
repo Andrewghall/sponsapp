@@ -8,7 +8,8 @@ import { v4 as uuidv4 } from 'uuid'
 
 interface AssessmentRequest {
   projectId: string
-  captureId: string
+  captureId?: string
+  lineItemId?: string
   transcript: string
 }
 
@@ -26,32 +27,65 @@ interface Observation {
 }
 
 export async function POST(request: NextRequest) {
-  const traceId = uuidv4()
-  console.log(`[${traceId}] AgenticAssessment: Starting assessment`)
-  
   try {
-    const { projectId, captureId, transcript }: AssessmentRequest = await request.json()
+    const body = await request.json() as AssessmentRequest
+    const { projectId, captureId, lineItemId, transcript } = body
     
-    if (!projectId || !captureId || !transcript) {
+    if (!projectId || !transcript) {
       return NextResponse.json(
-        { error: 'Missing required fields: projectId, captureId, transcript' },
+        { error: 'Missing required fields: projectId, transcript' },
         { status: 400 }
       )
     }
     
-    // Get the original line item to copy project/zone info
-    const originalLineItem = await prisma.line_items.findFirst({
-      where: { 
-        project_id: projectId,
-        captures: {
-          some: { id: captureId }
-        }
+    const traceId = uuidv4()
+    console.log(`[${traceId}] Starting agentic assessment for project ${projectId}`)
+    
+    // Find capture - prioritize captureId, fallback to lineItemId lookup
+    let capture = null
+    if (captureId) {
+      capture = await prisma.captures.findUnique({
+        where: { id: captureId },
+        include: { line_items: true }
+      })
+    }
+    
+    // Fallback: find most recent capture for this line item
+    if (!capture && lineItemId) {
+      capture = await prisma.captures.findFirst({
+        where: { line_item_id: lineItemId },
+        orderBy: { created_at: 'desc' },
+        include: { line_items: true }
+      })
+    }
+    
+    // If still no capture, create a dummy one for tracking
+    if (!capture) {
+      console.log(`[${traceId}] No capture found, creating dummy for line item ${lineItemId}`)
+      // Get the line item to use as reference
+      const lineItem = lineItemId ? await prisma.line_items.findUnique({
+        where: { id: lineItemId }
+      }) : null
+      
+      if (!lineItem) {
+        return NextResponse.json(
+          { error: 'Cannot find line item to create dummy capture' },
+          { status: 404 }
+        )
       }
-    })
+      
+      capture = {
+        id: `dummy-${traceId}`,
+        line_item_id: lineItemId,
+        line_items: [lineItem]
+      }
+    }
+    
+    const originalLineItem = Array.isArray(capture.line_items) ? capture.line_items[0] : capture.line_items
     
     if (!originalLineItem) {
       return NextResponse.json(
-        { error: 'Original line item not found for capture' },
+        { error: 'No line item found for capture' },
         { status: 404 }
       )
     }

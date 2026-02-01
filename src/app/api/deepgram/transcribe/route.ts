@@ -163,6 +163,7 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify({ 
             projectId: originalLineItem.project_id,
             captureId,
+            lineItemId: lineItemId,
             transcript: result.transcript 
           }),
         }).catch(err => console.error('Failed to trigger agentic assessment:', err))

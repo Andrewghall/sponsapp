@@ -306,25 +306,57 @@ export async function processObservationsAgentic(
   const results: MatchResult[] = []
   
   for (const observation of observations) {
-    const result = await agenticMatcher(observation, lineItemId, traceId)
-    results.push(result)
-    
-    // Persist result to line item
-    await prisma.line_items.update({
-      where: { id: lineItemId },
-      data: {
-        pass2_status: result.confidence >= 0.75 ? 'MATCHED' : 'QS_REVIEW',
-        pass2_confidence: result.confidence,
-        spons_candidate_code: result.spons_code,
-        spons_candidate_label: result.description,
-        spons_candidates: result.spons_code ? [{
-          item_code: result.spons_code,
-          description: result.description || '',
-          score: result.confidence
-        }] : [],
-        pass2_error_new: result.confidence < 0.75 ? result.reasoning : null,
-      },
-    })
+    try {
+      const result = await agenticMatcher(observation, lineItemId, traceId)
+      results.push(result)
+      
+      // Persist result to line item
+      await prisma.line_items.update({
+        where: { id: lineItemId },
+        data: {
+          pass2_status: result.confidence >= 0.75 ? 'MATCHED' : 'QS_REVIEW',
+          pass2_confidence: result.confidence,
+          spons_candidate_code: result.spons_code,
+          spons_candidate_label: result.description,
+          spons_candidates: result.spons_code ? [{
+            item_code: result.spons_code,
+            description: result.description || '',
+            score: result.confidence
+          }] : [],
+          pass2_error_new: result.confidence < 0.75 ? result.reasoning : null,
+        },
+      })
+    } catch (error) {
+      console.error(`[${traceId}] Error in agentic matcher for ${lineItemId}:`, error)
+      
+      // Still create a fallback result
+      const fallbackResult: MatchResult = {
+        spons_code: null,
+        description: null,
+        confidence: 0,
+        reasoning: error instanceof Error ? error.message : 'Matching failed',
+        attempts: 0,
+        final_query: ''
+      }
+      results.push(fallbackResult)
+      
+      // Mark as QS Review but keep visible
+      try {
+        await prisma.line_items.update({
+          where: { id: lineItemId },
+          data: {
+            pass2_status: 'QS_REVIEW',
+            pass2_confidence: 0,
+            spons_candidate_code: null,
+            spons_candidate_label: null,
+            spons_candidates: [],
+            pass2_error_new: fallbackResult.reasoning,
+          },
+        })
+      } catch (updateError) {
+        console.error(`[${traceId}] Failed to update line item ${lineItemId}:`, updateError)
+      }
+    }
   }
   
   return results

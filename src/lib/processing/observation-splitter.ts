@@ -25,18 +25,22 @@ interface ObservationResponse {
 }
 
 export async function splitTranscriptIntoObservations(transcript: string): Promise<Observation[]> {
-  const prompt = `You are an extraction engine for building-condition survey notes. Your job is to convert a spoken inspection transcript into a clean list of discrete observations. Do not price, do not recommend repairs beyond what is stated, and do not guess. If something is unclear, set the field to null.
-
-Extract discrete inspection observations from the transcript below.
+  const prompt = `You are a building inspection expert. Split this transcript into discrete observations.
+  
+Each observation should contain:
+- asset_type: Type of equipment/element
+- issue: What's wrong or needed
+- location: Where it is (if mentioned)
+- trade: Fire|HVAC|Mechanical|Electrical|General
+- attributes: size, rating, capacity_kw, phase, count, identifier
+- confidence: high|medium|low
 
 Rules:
-•	Split into separate observations. One observation equals one asset or one defect event.
-•	If multiple issues refer to the same asset, keep them in one observation only if clearly the same asset.
-•	Keep wording short, factual, and survey-style.
-•	Do not invent locations, quantities, ratings, or sizes.
-•	Normalise units where possible (kW, mm, 600x600).
-•	If the transcript contains multiple assets in one sentence, still split.
-•	Output MUST be valid JSON only, no commentary.
+• Split multiple assets into separate observations
+• If unclear, use "low" confidence
+• Extract technical details (sizes, ratings)
+• If the transcript contains multiple assets in one sentence, still split.
+• Output MUST be valid JSON only, no commentary.
 
 Output schema:
 {
@@ -57,26 +61,30 @@ Output schema:
 "confidence": "high|medium|low"
 }
 ]
-}
-
-Transcript:
-<<<
-${transcript}
-<<<`
+}`
 
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        {
+          role: 'system',
+          content: prompt
+        },
+        {
+          role: 'user',
+          content: transcript
+        }
+      ],
       temperature: 0.1,
-      response_format: { type: 'json_object' },
     })
-
-    const content = response.choices[0]?.message?.content
+    
+    const content = response.choices[0].message.content
     if (!content) {
-      throw new Error('No response from OpenAI')
+      throw new Error('No content from OpenAI')
     }
-
+    
+    // Parse JSON response
     const parsed = JSON.parse(content) as ObservationResponse
     
     // Ensure we have an array
