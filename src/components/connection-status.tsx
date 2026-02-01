@@ -11,21 +11,48 @@ export function ConnectionStatusBar() {
   // Check actual connectivity by pinging the API
   const checkConnectivity = async () => {
     setIsChecking(true)
+    console.log('Starting connectivity check...')
+    
     try {
-      // Try to fetch a lightweight endpoint
+      // First try the projects API
       const response = await fetch('/api/projects', { 
-        method: 'HEAD',
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        method: 'GET',
+        signal: AbortSignal.timeout(3000), // 3 second timeout
+        headers: {
+          'Accept': 'application/json',
+        }
       })
       
-      if (response.ok) {
+      console.log('API response status:', response.status)
+      
+      if (response.ok || response.status === 401) {
+        // 401 is ok - it means the server is reachable
+        console.log('Connection test successful')
         setConnectionStatus('online')
       } else {
+        console.log('API returned error status:', response.status)
         setConnectionStatus('offline')
       }
     } catch (error) {
-      console.log('Connectivity check failed:', error)
-      setConnectionStatus('offline')
+      console.log('Primary connectivity check failed:', error)
+      
+      // Fallback: try a simple health check
+      try {
+        const healthResponse = await fetch('/', { 
+          method: 'HEAD',
+          signal: AbortSignal.timeout(2000)
+        })
+        
+        if (healthResponse.ok) {
+          console.log('Fallback connection test successful')
+          setConnectionStatus('online')
+        } else {
+          setConnectionStatus('offline')
+        }
+      } catch (fallbackError) {
+        console.log('Fallback connectivity check also failed:', fallbackError)
+        setConnectionStatus('offline')
+      }
     } finally {
       setIsChecking(false)
     }
