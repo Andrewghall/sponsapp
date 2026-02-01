@@ -26,9 +26,7 @@ export async function POST(request: NextRequest) {
     await prisma.line_items.update({
       where: { id: lineItemId },
       data: { 
-        status: 'PENDING_PASS2',
-        pass2_error: null,
-        pass2_completed_at: null
+        status: 'PENDING_PASS2'
       }
     })
     
@@ -40,9 +38,7 @@ export async function POST(request: NextRequest) {
       await prisma.line_items.update({
         where: { id: lineItemId },
         data: { 
-          status: result.status,
-          pass2_completed_at: new Date(),
-          pass2_error: null
+          status: result.status
         }
       })
       
@@ -74,9 +70,7 @@ export async function POST(request: NextRequest) {
       await prisma.line_items.update({
         where: { id: lineItemId },
         data: { 
-          status: 'PASS2_ERROR',
-          pass2_error: errorMessage,
-          pass2_completed_at: new Date()
+          status: 'PENDING_PASS2'
         }
       })
       
