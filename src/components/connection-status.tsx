@@ -31,17 +31,17 @@ export function ConnectionStatusBar() {
       clearTimeout(timeoutId)
       
       if (response.status === 200 && navigator.onLine === true) {
-        // Online = navigator.onLine === true AND GET /api/health === 200
+        // Online = navigator.onLine === true AND /api/health returns 200
         setConnectionStatus('online')
         backoffRef.current = 1000 // Reset backoff
         console.log('Network connectivity confirmed - online')
       } else {
-        // Any other status = offline
+        // Any other status = offline (only if network request fails or navigator.onLine is false)
         setConnectionStatus('offline')
         console.log('Network check failed - offline')
       }
     } catch (error) {
-      // Only mark as offline for actual network errors
+      // Only mark as offline for actual network errors (timeout/fetch failures)
       if (error instanceof Error && (
         error.name === 'AbortError' || 
         error.name === 'TypeError' || 
@@ -54,9 +54,10 @@ export function ConnectionStatusBar() {
         // Exponential backoff for retries
         backoffRef.current = Math.min(backoffRef.current * 2, maxBackoff)
       } else {
-        // Other errors - treat as offline
-        setConnectionStatus('offline')
-        console.log('Network error (not network):', error)
+        // Other errors (shouldn't happen with /api/health but just in case)
+        // If /api/health request succeeded but had other issues, stay online
+        console.log('Unexpected error in health check:', error)
+        // Don't change connection status for non-network errors
       }
     } finally {
       setIsChecking(false)
