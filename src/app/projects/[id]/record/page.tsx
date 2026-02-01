@@ -71,9 +71,9 @@ export default function RecordPage() {
       
       setRecentCaptures(prev => [...newItems, ...prev].slice(0, 10))
       
-      // Navigate to items page to show results
+      // Navigate to home screen after recording
       setTimeout(() => {
-        router.push(`/projects/${projectId}/items`)
+        router.push('/')
       }, 1000)
     }
   }, [projectId, router])
