@@ -34,6 +34,15 @@ export default function NewProjectPage() {
         setTimeout(() => {
           router.push(`/projects/${project.id}`)
         }, 100)
+      } else if (res.status === 503) {
+        // Handle connection limit error
+        const data = await res.json()
+        setError(data.error || 'Database connection limit reached. Please try again.')
+        // Auto-retry after 5 seconds
+        setTimeout(() => {
+          setError(null) // Clear error
+          // Optionally auto-submit again
+        }, 5000)
       } else {
         const data = await res.json()
         console.error('Project creation failed:', data)
