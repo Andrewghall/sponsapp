@@ -38,6 +38,51 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
   const rafIdRef = useRef<number | null>(null)
   const [level, setLevel] = useState(0)
 
+  // Comprehensive state reset function
+  const resetRecordingState = useCallback(() => {
+    // Reset component state
+    setLevel(0)
+    
+    // Reset refs
+    audioChunksRef.current = []
+    startTimeRef.current = 0
+    
+    // Clear audio context
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    analyserRef.current = null
+    analyserDataRef.current = null
+    
+    // Clear animation frame
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = null
+    }
+    
+    // Reset global store state
+    setRecordingStatus('idle')
+    setLiveTranscript('')
+    
+    // Clear media recorder and stream
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current = null
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    
+    // Clear websocket
+    if (websocketRef.current) {
+      websocketRef.current.close()
+      websocketRef.current = null
+    }
+    
+    console.log('🔄 Recording state reset complete')
+  }, [setRecordingStatus, setLiveTranscript])
+
   // Poll for status updates after transcription
   const pollForStatus = useCallback(async (captureId: string) => {
     let pollCount = 0
@@ -72,6 +117,9 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             // Refresh items list to show all observations
             router.refresh()
             
+            // Reset all recording state for next capture
+            resetRecordingState()
+            
             // Optionally navigate to items page
             // router.push(`/projects/${projectId}/items`)
           } else if (data.state === 'FAILED' || pollCount >= maxPolls) {
@@ -81,6 +129,9 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             
             // Still refresh items so user sees the results
             router.refresh()
+            
+            // Reset all recording state for next capture
+            resetRecordingState()
           }
         }
       } catch (error) {
@@ -90,6 +141,9 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
           setRecordingStatus('idle')
           onStatusChange?.('Saved, needs review')
           router.refresh()
+          
+          // Reset all recording state for next capture
+          resetRecordingState()
         }
       }
     }, 1000) // Poll every 1 second
@@ -361,6 +415,9 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             console.error(e)
             onStatusChange?.(`Error: ${message}`)
             setRecordingStatus('idle')
+            
+            // Reset all recording state for next capture even on error
+            resetRecordingState()
           }
         } else {
           onStatusChange?.('Saved offline (will sync later)')

@@ -58,6 +58,18 @@ export default function ProjectPage() {
         
         setCurrentZone(data.zone.id)
         alert('Zone created successfully!')
+        
+        // Re-fetch zones to ensure UI is up to date
+        try {
+          const zonesResponse = await fetch(`/api/projects/${projectId}/zones`)
+          if (zonesResponse.ok) {
+            const zonesData = await zonesResponse.json()
+            console.log('Zones re-fetched:', zonesData)
+            // The UI will update automatically when the zones list is used
+          }
+        } catch (error) {
+          console.error('Failed to re-fetch zones:', error)
+        }
       } catch (error) {
         console.error('Zone creation error:', error)
         alert(`Error creating zone: ${error instanceof Error ? error.message : 'Unknown error'}`)

@@ -2,15 +2,16 @@
 
 import { useRef, useCallback, useState } from 'react'
 import { Mic, Square, CheckCircle, AlertCircle } from 'lucide-react'
-import { createOfflineCapture, updateCaptureSyncStatus } from '@/lib/offline-db'
-import { CaptureContext } from '@/lib/context/ContextManager'
-import { getSyncManager } from '@/lib/sync/SyncManager'
-import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import { useAppStore } from '@/store/index'
+import { v4 as uuidv4 } from 'uuid'
+import { createOfflineCapture } from '@/lib/offline-db'
+import { SyncManager } from '@/lib/sync/SyncManager'
 
 interface RecordButtonProps {
   projectId: string
-  context: CaptureContext
+  context: any
   onCaptureComplete?: (captureId: string) => void
   onSyncStatusChange?: (captureId: string, status: string) => void
 }
@@ -22,6 +23,7 @@ export function RecordButton({
   onSyncStatusChange 
 }: RecordButtonProps) {
   const { connectionStatus } = useAppStore()
+  const router = useRouter()
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [status, setStatus] = useState<'idle' | 'recording' | 'processing' | 'complete' | 'error'>('idle')
@@ -33,6 +35,30 @@ export function RecordButton({
   const streamRef = useRef<MediaStream | null>(null)
   const recordingStartTimeRef = useRef<number>(0)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Comprehensive state reset function
+  const resetRecordingState = useCallback(() => {
+    // Reset component state
+    setIsRecording(false)
+    setRecordingTime(0)
+    setStatus('idle')
+    setStatusMessage('')
+    setShowNextAreaPrompt(false)
+    
+    // Reset refs
+    audioChunksRef.current = []
+    streamRef.current = null
+    mediaRecorderRef.current = null
+    recordingStartTimeRef.current = 0
+    
+    // Clear recording interval
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current)
+      recordingIntervalRef.current = null
+    }
+    
+    console.log('🔄 Capture recording state reset complete')
+  }, [])
 
   const startRecording = useCallback(async () => {
     try {
@@ -71,7 +97,7 @@ export function RecordButton({
             onCaptureComplete?.(capture.id)
             
             // Trigger sync immediately since we're online
-            const syncManager = getSyncManager()
+            const syncManager = new SyncManager()
             syncManager.processPendingCaptures()
           } else {
             // Only show "Saved offline" when actually offline
@@ -81,6 +107,9 @@ export function RecordButton({
             setStatus('complete')
             
             onCaptureComplete?.(capture.id)
+            
+            // Refresh to update summary with new capture
+            router.refresh()
           }
           
           // Show next area prompt after a short delay
@@ -92,6 +121,9 @@ export function RecordButton({
           console.error('Failed to save capture:', error)
           setStatus('error')
           setStatusMessage('Failed to save capture')
+          
+          // Reset state for next capture even on error
+          resetRecordingState()
         }
       }
 
@@ -138,6 +170,9 @@ export function RecordButton({
     setShowNextAreaPrompt(false)
     setStatus('idle')
     setStatusMessage('')
+    
+    // Reset all recording state for next capture
+    resetRecordingState()
     
     if (!keepSame) {
       // TODO: Open context selector
