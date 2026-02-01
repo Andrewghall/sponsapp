@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { Wifi, WifiOff, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { useAppStore, ConnectionStatus } from '@/store'
 
 export function ConnectionStatusBar() {
@@ -16,7 +16,7 @@ export function ConnectionStatusBar() {
     setIsChecking(true)
     
     try {
-      // Use /api/health which has no database dependencies
+      // Only check /api/health which has no database dependencies
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 2000) // 2 second timeout
       
@@ -30,18 +30,15 @@ export function ConnectionStatusBar() {
       
       clearTimeout(timeoutId)
       
-      if (response.ok) {
-        // Network is reachable
+      if (response.status === 200 && navigator.onLine === true) {
+        // Online = navigator.onLine === true AND GET /api/health === 200
         setConnectionStatus('online')
         backoffRef.current = 1000 // Reset backoff
-        console.log('Network connectivity confirmed')
-        
-        // Now check API health separately
-        checkAPIHealth()
+        console.log('Network connectivity confirmed - online')
       } else {
-        // Server responded but with error - network is fine, server has issues
-        setConnectionStatus('server_error')
-        console.log('Network reachable but server error')
+        // Any other status = offline
+        setConnectionStatus('offline')
+        console.log('Network check failed - offline')
       }
     } catch (error) {
       // Only mark as offline for actual network errors
@@ -57,49 +54,16 @@ export function ConnectionStatusBar() {
         // Exponential backoff for retries
         backoffRef.current = Math.min(backoffRef.current * 2, maxBackoff)
       } else {
-        // Other errors - treat as server error
-        setConnectionStatus('server_error')
-        console.log('Server error (not network):', error)
+        // Other errors - treat as offline
+        setConnectionStatus('offline')
+        console.log('Network error (not network):', error)
       }
     } finally {
       setIsChecking(false)
     }
   }
 
-  // Check API health (database-dependent)
-  const checkAPIHealth = async () => {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 3000)
-      
-      const response = await fetch('/api/projects', { 
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json',
-        }
-      })
-      
-      clearTimeout(timeoutId)
-      
-      if (response.ok || response.status === 401) {
-        // API is healthy
-        console.log('API health check passed')
-      } else if (response.status === 500) {
-        // Database/connection issues
-        setConnectionStatus('server_error')
-        console.log('API health check failed with 500 - database issues')
-      } else {
-        setConnectionStatus('server_error')
-        console.log('API health check failed with status:', response.status)
-      }
-    } catch (error) {
-      // API health check failed - update status
-      setConnectionStatus('server_error')
-      console.log('API health check failed:', error)
-    }
-  }
-
+  
   useEffect(() => {
     const updateStatus = () => {
       // First check browser's online status
@@ -151,11 +115,6 @@ export function ConnectionStatusBar() {
       text: isChecking ? '🟡 Checking connection...' : '🔴 No internet connection',
       bg: 'bg-red-500',
     },
-    server_error: {
-      icon: AlertTriangle,
-      text: '🟠 Server issues - recording offline',
-      bg: 'bg-amber-500',
-    },
     syncing: {
       icon: RefreshCw,
       text: `🟢 Processing backlog (${pendingCount})`,
@@ -173,7 +132,7 @@ export function ConnectionStatusBar() {
         className={connectionStatus === 'syncing' || isChecking ? 'animate-spin' : ''} 
       />
       <span>{config.text}</span>
-      {(connectionStatus === 'offline' || connectionStatus === 'server_error') && !isChecking && (
+      {(connectionStatus === 'offline') && !isChecking && (
         <button
           onClick={checkNetworkConnectivity}
           className="ml-2 text-white/80 hover:text-white transition-colors"

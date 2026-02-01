@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type ConnectionStatus = 'online' | 'offline' | 'server_error' | 'syncing'
+export type ConnectionStatus = 'online' | 'offline' | 'syncing'
 export type RecordingStatus = 'idle' | 'recording' | 'processing'
 
 interface AppState {
