@@ -286,6 +286,8 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
 
             const data = await res.json()
             const transcript = typeof data?.transcript === 'string' ? data.transcript : ''
+            console.log('Transcription response:', data)
+            
             if (transcript) {
               setLiveTranscript(transcript)
               onStatusChange?.('Processing…')
