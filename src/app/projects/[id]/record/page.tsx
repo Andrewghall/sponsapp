@@ -10,8 +10,16 @@ import { useAppStore } from '@/store'
 
 type RecentCapture = {
   id: string
-  status: 'PENDING_PASS1' | 'PASS1_COMPLETE'
+  status: string
   transcript?: string
+  description?: string
+  type?: string
+  category?: string
+  location?: string
+  floor?: string
+  sponsCode?: string
+  sponsDescription?: string
+  sponsCost?: number
 }
 
 export default function RecordPage() {
@@ -24,12 +32,30 @@ export default function RecordPage() {
   const [statusText, setStatusText] = useState<string>('')
 
   const handleCaptureComplete = useCallback((captureId: string) => {
-    setRecentCaptures((prev) => [{ id: captureId, status: 'PENDING_PASS1' } as RecentCapture, ...prev].slice(0, 5))
+    setRecentCaptures((prev) => [{ id: captureId, status: 'PENDING_PASS1', transcript: 'Processing...' } as RecentCapture, ...prev].slice(0, 5))
   }, [])
 
   const handleCaptureCompleteWithTranscript = useCallback((captureId: string, transcript: string) => {
     setRecentCaptures(prev =>
       prev.map((c) => (c.id === captureId ? { ...c, status: 'PASS1_COMPLETE', transcript } : c))
+    )
+  }, [])
+
+  // Add a function to update capture with Pass 2 results
+  const handlePass2Complete = useCallback((captureId: string, data: any) => {
+    setRecentCaptures(prev =>
+      prev.map((c) => (c.id === captureId ? { 
+        ...c, 
+        status: data.status,
+        description: data.description,
+        type: data.type,
+        category: data.category,
+        location: data.location,
+        floor: data.floor,
+        sponsCode: data.sponsCode,
+        sponsDescription: data.sponsDescription,
+        sponsCost: data.sponsCost
+      } : c))
     )
   }, [])
 
@@ -76,6 +102,7 @@ export default function RecordPage() {
           onCaptureComplete={handleCaptureComplete}
           onCaptureCompleteWithTranscript={handleCaptureCompleteWithTranscript}
           onStatusChange={setStatusText}
+          onPass2Complete={handlePass2Complete}
         />
 
         <div className="mt-4 text-sm text-gray-600 text-center min-h-[20px]">
@@ -105,6 +132,14 @@ export default function RecordPage() {
                 id={capture.id}
                 status={capture.status}
                 transcript={capture.transcript || 'Processing...'}
+                description={capture.description}
+                type={capture.type}
+                category={capture.category}
+                location={capture.location}
+                floor={capture.floor}
+                sponsCode={capture.sponsCode}
+                sponsDescription={capture.sponsDescription}
+                sponsCost={capture.sponsCost}
               />
             ))}
           </div>

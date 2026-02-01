@@ -10,12 +10,13 @@ import { useRouter } from 'next/navigation'
 interface RecordButtonProps {
   projectId: string
   zoneId?: string
-  onCaptureComplete: (captureId: string) => void
+  onCaptureComplete?: (captureId: string) => void
   onCaptureCompleteWithTranscript?: (captureId: string, transcript: string) => void
-  onStatusChange?: (statusText: string) => void
+  onStatusChange?: (status: string) => void
+  onPass2Complete?: (captureId: string, data: any) => void
 }
 
-export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCompleteWithTranscript, onStatusChange }: RecordButtonProps) {
+export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCompleteWithTranscript, onStatusChange, onPass2Complete }: RecordButtonProps) {
   const router = useRouter()
   const { 
     recordingStatus, 
@@ -39,19 +40,54 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
 
   // Poll for status updates after transcription
   const pollForStatus = useCallback(async (captureId: string) => {
-    try {
-      const response = await fetch(`/api/captures/${captureId}/status`)
-      if (response.ok) {
-        const data = await response.json()
-        // Update UI based on status
-        if (data.status === 'PASS2_COMPLETE' || data.status === 'PENDING_QS_REVIEW' || data.status === 'APPROVED') {
-          onStatusChange?.('Ready')
+    let pollCount = 0
+    const maxPolls = 20 // 20 seconds timeout
+    
+    const pollInterval = setInterval(async () => {
+      pollCount++
+      
+      try {
+        const response = await fetch(`/api/captures/${captureId}/status`)
+        if (response.ok) {
+          const data = await response.json()
+          
+          // Check for completion or error
+          if (data.status === 'PASS2_COMPLETE' || data.status === 'PENDING_QS_REVIEW' || data.status === 'APPROVED') {
+            clearInterval(pollInterval)
+            setRecordingStatus('idle')
+            onStatusChange?.('Ready')
+            
+            // Call Pass 2 complete callback with data
+            onPass2Complete?.(captureId, data)
+            
+            // Refresh items list to show Pass 2 results
+            router.refresh()
+            
+            // Optionally navigate to items page
+            // router.push(`/projects/${projectId}/items`)
+          } else if (data.pass2_error || pollCount >= maxPolls) {
+            clearInterval(pollInterval)
+            setRecordingStatus('idle')
+            onStatusChange?.('Saved, needs review')
+            
+            // Still refresh items so user sees the new row
+            router.refresh()
+          }
+        }
+      } catch (error) {
+        console.error('Failed to poll status:', error)
+        if (pollCount >= maxPolls) {
+          clearInterval(pollInterval)
+          setRecordingStatus('idle')
+          onStatusChange?.('Saved, needs review')
+          router.refresh()
         }
       }
-    } catch (error) {
-      console.error('Failed to poll status:', error)
-    }
-  }, [onStatusChange])
+    }, 1000) // Poll every 1 second
+    
+    // Cleanup on unmount
+    return () => clearInterval(pollInterval)
+  }, [onStatusChange, onPass2Complete, projectId, router])
 
   useEffect(() => {
     return () => {
@@ -292,38 +328,28 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             
             if (transcript) {
               setLiveTranscript(transcript)
-              onStatusChange?.('Capture saved successfully')
+              onStatusChange?.('Captured')
               onCaptureCompleteWithTranscript?.(captureId, transcript)
               
-              // Clear processing state
-              setRecordingStatus('idle')
+              // Set processing state
+              setRecordingStatus('processing')
               
-              // Navigate to items page
-              router.push(`/projects/${projectId}/items`)
-              
-              // Force refresh
-              router.refresh()
-              
-              // Start polling for Pass 2 status updates (async, non-blocking)
-              setTimeout(() => {
-                pollForStatus(captureId)
-              }, 2000)
+              // Start polling for Pass 2 status updates
+              pollForStatus(captureId)
             } else {
-              onStatusChange?.('Capture saved (no transcript)')
+              onStatusChange?.('Captured (no transcript)')
               
-              // Clear processing state
-              setRecordingStatus('idle')
+              // Set processing state
+              setRecordingStatus('processing')
               
-              // Navigate to items page
-              router.push(`/projects/${projectId}/items`)
-              
-              // Force refresh
-              router.refresh()
+              // Start polling for Pass 2 status updates
+              pollForStatus(captureId)
             }
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e)
             console.error(e)
             onStatusChange?.(`Error: ${message}`)
+            setRecordingStatus('idle')
           }
         } else {
           onStatusChange?.('Saved offline (will sync later)')
