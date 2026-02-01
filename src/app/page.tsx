@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { FolderOpen, Plus, ChevronRight, Trash2, BarChart3, CheckCircle, AlertCircle, Clock, Search } from "lucide-react";
+import { FolderOpen, Plus, ChevronRight, BarChart3, CheckCircle, AlertCircle, Clock, Search } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { DeleteProjectButton } from "@/components/DeleteProjectButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -259,23 +260,10 @@ export default async function Home() {
                       >
                         <BarChart3 size={16} />
                       </Link>
-                      <form
-                        action={`/api/projects/${project.id}/delete`}
-                        method="POST"
-                        onSubmit={(e) => {
-                          if (!confirm('Are you sure you want to delete this project and all its data? This action cannot be undone.')) {
-                            e.preventDefault()
-                          }
-                        }}
-                      >
-                        <button
-                          type="submit"
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                          title="Delete project"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </form>
+                      <DeleteProjectButton 
+                        projectId={project.id} 
+                        projectName={project.name} 
+                      />
                     </div>
                   </div>
                   
