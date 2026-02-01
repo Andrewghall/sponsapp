@@ -25,7 +25,7 @@ export async function GET(
     const capture = await prisma.captures.findUnique({
       where: { id: captureId },
       include: {
-        line_item: true
+        line_items: true
       }
     })
 
