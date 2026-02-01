@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
         })
 
         if (existing) {
+          // Already processed - add existing mapping to results
+          results.lineItemIds.push({ captureId: capture.id, lineItemId: existing.line_item_id })
           results.synced++
           continue
         }
