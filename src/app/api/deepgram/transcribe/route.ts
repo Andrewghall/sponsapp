@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { transcribeAudio } from '@/lib/deepgram'
 import { prisma } from '@/lib/prisma'
+import { createClient } from '@/lib/supabase/server'
+import { splitTranscriptIntoObservations } from '@/lib/processing/observation-splitter'
 import { processPass2 } from '@/lib/processing/pass2'
+import { transcribeAudio } from '@/lib/deepgram'
 
 // POST /api/deepgram/transcribe - Batch transcription for offline audio
 export async function POST(request: NextRequest) {
@@ -73,30 +75,87 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update line item status to PASS1_COMPLETE
-    if (lineItemId) {
+    // Split transcript into observations
+    console.log('Splitting transcript into observations:', result.transcript)
+    const observations = await splitTranscriptIntoObservations(result.transcript)
+    console.log('Split into observations:', observations)
+
+    // Create or update line items for each observation
+    if (lineItemId && observations.length > 0) {
+      // Get the original line item to copy project and zone info
+      const originalLineItem = await prisma.line_items.findUnique({ 
+        where: { id: lineItemId } 
+      })
+      
+      if (!originalLineItem) {
+        throw new Error('Original line item not found')
+      }
+
+      // If this is the first observation, update the original line item
+      const firstObservation = observations[0]
       await prisma.line_items.update({
         where: { id: lineItemId },
         data: {
           status: 'PASS1_COMPLETE',
           raw_transcript: result.transcript,
           transcript_timestamp: new Date(),
+          col_b_type: firstObservation.asset_type,
+          col_e_object: firstObservation.location,
+          col_g_description: firstObservation.condition,
         },
       })
 
-      // Create audit entry
+      // Create additional line items for remaining observations
+      for (let i = 1; i < observations.length; i++) {
+        const obs = observations[i]
+        const newLineItem = await prisma.line_items.create({
+          data: {
+            project_id: originalLineItem.project_id,
+            zone_id: originalLineItem.zone_id,
+            status: 'PASS1_COMPLETE',
+            raw_transcript: result.transcript,
+            transcript_timestamp: new Date(),
+            col_b_type: obs.asset_type,
+            col_e_object: obs.location,
+            col_g_description: obs.condition,
+          },
+        })
+
+        // Create audit entry for new line item
+        await prisma.audit_entries.create({
+          data: {
+            line_item_id: newLineItem.id,
+            action: 'TRANSCRIBED',
+            spoken_sentence: obs.full_observation,
+          },
+        })
+
+        // Trigger Pass 2 for new line item
+        console.log('Triggering async Pass 2 for new line item:', newLineItem.id)
+        try {
+          const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
+          fetch(`${base}/api/pass2`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lineItemId: newLineItem.id }),
+          }).catch(err => console.error('Failed to trigger Pass 2:', err))
+        } catch (error) {
+          console.error('Error triggering Pass 2:', error)
+        }
+      }
+
+      // Create audit entry for first line item
       await prisma.audit_entries.create({
         data: {
           line_item_id: lineItemId,
           action: 'TRANSCRIBED',
-          spoken_sentence: result.transcript,
+          spoken_sentence: firstObservation.full_observation,
         },
       })
 
-      // Trigger Pass 2 async (non-blocking)
+      // Trigger Pass 2 for first line item
       console.log('Triggering async Pass 2 for line item:', lineItemId)
       try {
-        // Fire and forget - don't await
         const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
         fetch(`${base}/api/pass2`, {
           method: 'POST',
@@ -105,7 +164,6 @@ export async function POST(request: NextRequest) {
         }).catch(err => console.error('Failed to trigger Pass 2:', err))
       } catch (error) {
         console.error('Error triggering Pass 2:', error)
-        // Continue - Pass 2 failure shouldn't break transcription
       }
     }
 
