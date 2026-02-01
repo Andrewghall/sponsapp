@@ -5,6 +5,8 @@ import { processPass2 } from '@/lib/processing/pass2'
 
 // POST /api/deepgram/transcribe - Batch transcription for offline audio
 export async function POST(request: NextRequest) {
+  console.log('Transcription endpoint called')
+  
   try {
     if (!process.env.DEEPGRAM_API_KEY) {
       return NextResponse.json(

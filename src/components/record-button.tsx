@@ -263,6 +263,7 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             formData.append('captureId', captureId)
             formData.append('lineItemId', lineItemId)
 
+            console.log('Sending transcription request for:', { captureId, lineItemId })
             const res = await fetch('/api/deepgram/transcribe', {
               method: 'POST',
               body: formData,
