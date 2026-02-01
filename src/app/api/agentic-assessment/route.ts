@@ -27,6 +27,9 @@ interface Observation {
 }
 
 export async function POST(request: NextRequest) {
+  // Generate traceId from header or create new one
+  const traceId = request.headers.get('x-trace-id') || uuidv4()
+  
   try {
     const body = await request.json() as AssessmentRequest
     const { projectId, captureId, lineItemId, transcript } = body
@@ -38,7 +41,6 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const traceId = uuidv4()
     console.log(`[${traceId}] Starting agentic assessment for project ${projectId}`)
     
     // Find capture - prioritize captureId, fallback to lineItemId lookup
@@ -191,19 +193,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       started: true,
-      captureGroupId: captureId,
       estimatedObservations: observations.length,
-      traceId
+      traceId,
+      captureId: capture.id,
+      projectId
     })
     
   } catch (error) {
-    console.error(`[${traceId}] AgenticAssessment error:`, error)
-    
+    console.error(`[${traceId}] AgenticAssessment failed:`, error)
     return NextResponse.json(
       { 
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        traceId 
+        error: 'Internal server error',
+        traceId,
+        message: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     )
