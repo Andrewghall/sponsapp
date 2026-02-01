@@ -26,9 +26,7 @@ export async function POST(request: NextRequest) {
     await prisma.line_items.update({
       where: { id: lineItemId },
       data: { 
-        status: 'PENDING_PASS2',
-        pass2_error: null,
-        pass2_completed_at: null
+        status: 'PENDING_PASS2'
       }
     })
     
@@ -40,9 +38,7 @@ export async function POST(request: NextRequest) {
       await prisma.line_items.update({
         where: { id: lineItemId },
         data: { 
-          status: result.status,
-          pass2_completed_at: new Date(),
-          pass2_error: null
+          status: result.status
         }
       })
       
@@ -53,8 +49,7 @@ export async function POST(request: NextRequest) {
         traceId,
         result: {
           status: result.status,
-          candidatesFound: result.candidates?.length || 0,
-          agentDecision: result.agentDecision ? 'completed' : 'skipped'
+          candidatesFound: result.candidates?.length || 0
         }
       })
       
@@ -62,13 +57,20 @@ export async function POST(request: NextRequest) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       console.error(`[${traceId}] Pass 2 failed for ${lineItemId}:`, errorMessage)
       
-      // Store error on line item
+      // Store error on line item (using audit_entries for now since schema not updated)
+      await prisma.audit_entries.create({
+        data: {
+          line_item_id: lineItemId,
+          action: 'PASS2_ERROR' as any,
+          metadata: { error: errorMessage, traceId }
+        }
+      })
+      
+      // Update status to error (using PENDING_PASS2 for now since schema not updated)
       await prisma.line_items.update({
         where: { id: lineItemId },
         data: { 
-          status: 'PASS2_ERROR',
-          pass2_error: errorMessage,
-          pass2_completed_at: new Date()
+          status: 'PENDING_PASS2'
         }
       })
       
@@ -94,63 +96,5 @@ export async function POST(request: NextRequest) {
       error: errorMessage,
       traceId
     }, { status: 500 })
-  }
-}
-
-// GET /api/pass2/[lineItemId] - Get Pass 2 status
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ lineItemId: string }> }
-) {
-  try {
-    const { lineItemId } = await context.params
-    
-    const lineItem = await prisma.line_items.findUnique({
-      where: { id: lineItemId },
-      select: {
-        id: true,
-        status: true,
-        pass2_error: true,
-        pass2_completed_at: true,
-        spons_matches: {
-          select: {
-            id: true,
-            similarity_score: true,
-            is_selected: true,
-            spons_items: {
-              select: {
-                item_code: true,
-                description: true,
-                unit: true,
-                trade: true
-              }
-            }
-          }
-        }
-      }
-    })
-    
-    if (!lineItem) {
-      return NextResponse.json({ error: 'Line item not found' }, { status: 404 })
-    }
-    
-    return NextResponse.json({
-      lineItemId,
-      status: lineItem.status,
-      pass2Error: lineItem.pass2_error,
-      pass2CompletedAt: lineItem.pass2_completed_at,
-      candidates: lineItem.spons_matches.map(m => ({
-        id: m.id,
-        similarityScore: m.similarity_score,
-        isSelected: m.is_selected,
-        item: m.spons_items
-      }))
-    })
-  } catch (error) {
-    console.error('Get Pass 2 status error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
   }
 }
