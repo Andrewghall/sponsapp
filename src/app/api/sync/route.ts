@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 export async function POST(request: NextRequest) {
   try {
     const { captures } = await request.json()
+    console.log('Sync request captures:', captures)
 
     const results = {
       synced: 0,
@@ -92,11 +93,13 @@ export async function POST(request: NextRequest) {
 
         results.synced++
       } catch (error) {
+        console.error('Error processing capture:', capture.id, error)
         results.failed++
         results.errors.push(`Capture ${capture.id}: ${error}`)
       }
     }
 
+    console.log('Sync results:', results)
     return NextResponse.json({
       success: true,
       ...results,
