@@ -79,8 +79,8 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
         (embedding <=> ${normalized.description}::vector) AS similarity
       FROM spons_items
       WHERE 
-        (${normalized.trade ? `trade = '${normalized.trade}'` : 'true'})
-        AND unit = ANY(${compatibleUnits(normalized.unit)})
+        ${normalized.trade ? `trade = '${normalized.trade}' AND` : ''}
+        unit = ANY(${compatibleUnits(normalized.unit)})
       ORDER BY similarity ASC
       LIMIT ${MAX_CANDIDATES}
     `
