@@ -37,6 +37,8 @@ const MANDATORY_FIELDS = [
 
 // Process a line item through Pass 2
 export async function processPass2(lineItemId: string): Promise<Pass2Result> {
+  console.log('Pass 2: Processing line item:', lineItemId)
+
   const lineItem = await prisma.line_items.findUnique({
     where: { id: lineItemId },
     include: {
