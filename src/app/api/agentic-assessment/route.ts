@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     
     // Step 2: Split transcript into observations
     console.log(`[${traceId}] Step 2: Splitting transcript into observations`)
-    const observations = await splitTranscriptIntoObservations(normalizedTranscript, traceId)
+    const observations = await splitTranscriptIntoObservations(normalizedTranscript)
     console.log(`[${traceId}] Split into ${observations.length} observations`)
     
     // Step 3: Process observations pipeline - clean, deduplicate, infer quantities
