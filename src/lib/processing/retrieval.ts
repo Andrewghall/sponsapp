@@ -26,7 +26,7 @@ export interface RetrievedCandidate {
 const SIMILARITY_THRESHOLD = 0.65
 const MAX_CANDIDATES = 10
 
-async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(text: string): Promise<number[]> {
   const response = await openai.embeddings.create({
     model: 'text-embedding-3-small',
     input: text,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { splitTranscriptIntoObservations } from '@/lib/processing/observation-splitter'
-import { processObservationsAgentic } from '@/lib/processing/agentic-matcher'
+import { processObservationComplete } from '@/lib/processing/complete-processor'
 import { normalizeTranscript, detectMultipleAssets } from '@/lib/processing/agentic-matcher'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       data: { pass2_status: 'MATCHING' }
     })
     
-    // Process each observation with agentic matcher
+    // Process each observation independently with complete pipeline
     for (const lineItem of childLineItems) {
       try {
         console.log(`[${traceId}] Processing observation: ${lineItem.col_b_type} - ${lineItem.col_g_description}`)
@@ -169,22 +169,30 @@ export async function POST(request: NextRequest) {
           continue
         }
         
-        // Run agentic matching with retries
-        const results = await processObservationsAgentic([observation], lineItem.id, traceId)
+        // Run complete processing pipeline: Embed → Retrieve → Verify → Persist
+        const result = await processObservationComplete(observation, lineItem.id, traceId)
         
-        console.log(`[${traceId}] Completed observation: ${results[0]?.spons_code || 'NO MATCH'} (confidence: ${results[0]?.confidence})`)
+        console.log(`[${traceId}] Completed observation: ${result.spons_code || 'NO MATCH'} (confidence: ${result.confidence})`)
         
       } catch (error) {
         console.error(`[${traceId}] Error processing observation ${lineItem.id}:`, error)
         
-        // Mark as failed
-        await prisma.line_items.update({
-          where: { id: lineItem.id },
-          data: {
-            pass2_status: 'FAILED',
-            pass2_error_new: error instanceof Error ? error.message : 'Unknown error',
-          },
-        })
+        // Mark as failed but still update status
+        try {
+          await prisma.line_items.update({
+            where: { id: lineItem.id },
+            data: {
+              pass2_status: 'FAILED',
+              pass2_confidence: 0,
+              spons_candidate_code: null,
+              spons_candidate_label: null,
+              spons_candidates: [],
+              pass2_error_new: error instanceof Error ? error.message : 'Unknown error',
+            },
+          })
+        } catch (updateError) {
+          console.error(`[${traceId}] Failed to update line item ${lineItem.id}:`, updateError)
+        }
       }
     }
     
