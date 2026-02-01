@@ -49,6 +49,13 @@ export default function ProjectPage() {
         
         const data = await response.json()
         console.log('Zone created successfully:', data)
+        
+        if (!data.zone || !data.zone.id) {
+          console.error('Zone created but missing zone ID:', data)
+          alert('Zone created but missing ID - please try again')
+          return
+        }
+        
         setCurrentZone(data.zone.id)
         alert('Zone created successfully!')
       } catch (error) {
