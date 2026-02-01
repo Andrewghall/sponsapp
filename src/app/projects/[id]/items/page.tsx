@@ -29,11 +29,31 @@ export default function ItemsPage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    // TODO: Fetch items for this project
-    // For now, return empty array
-    setItems([])
-    setLoading(false)
+    fetchItems()
   }, [projectId])
+
+  const fetchItems = async () => {
+    try {
+      setLoading(true)
+      console.log('Fetching items for project:', projectId)
+      const res = await fetch(`/api/projects/${projectId}/items`)
+      console.log('Items API response status:', res.status)
+      
+      if (!res.ok) {
+        console.error('Failed to fetch items:', res.status)
+        return
+      }
+      
+      const data = await res.json()
+      console.log('Items API response data:', data)
+      
+      setItems(data.items || [])
+    } catch (error) {
+      console.error('Error fetching items:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredItems = items.filter(item =>
     item.transcript?.toLowerCase().includes(searchTerm.toLowerCase()) ||

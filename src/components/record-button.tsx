@@ -295,7 +295,11 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
               onStatusChange?.('Saved')
               onCaptureCompleteWithTranscript?.(captureId, transcript)
               
-              // Refresh items list immediately
+              // Show toast notification
+              alert('Captured: ' + transcript)
+              
+              // Navigate to items page and refresh
+              router.push(`/projects/${projectId}/items`)
               router.refresh()
               
               // Start polling for Pass 2 status updates (async, non-blocking)
@@ -304,7 +308,11 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
               }, 2000)
             } else {
               onStatusChange?.('Saved (no transcript)')
-              // Refresh items list even without transcript
+              // Show toast notification
+              alert('Captured (no transcript)')
+              
+              // Navigate to items page and refresh even without transcript
+              router.push(`/projects/${projectId}/items`)
               router.refresh()
             }
           } catch (e) {
@@ -313,6 +321,8 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             onStatusChange?.(`Error: ${message}`)
           } finally {
             setRecordingStatus('idle')
+            // Clear any processing state
+            onStatusChange?.('')
           }
         } else {
           onStatusChange?.('Saved offline (will sync later)')
