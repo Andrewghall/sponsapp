@@ -32,7 +32,13 @@ export default function RecordPage() {
   const [statusText, setStatusText] = useState<string>('')
 
   const handleCaptureComplete = useCallback((captureId: string) => {
-    setRecentCaptures((prev) => [{ id: captureId, status: 'PENDING_PASS1', transcript: 'Processing...' } as RecentCapture, ...prev].slice(0, 5))
+    console.log('Capture completed:', captureId)
+    setRecentCaptures((prev) => [{ 
+      id: captureId, 
+      status: 'PENDING_PASS1', 
+      transcript: 'Processing...',
+      created_at: new Date().toISOString()
+    } as RecentCapture, ...prev].slice(0, 5))
   }, [])
 
   const handleCaptureCompleteWithTranscript = useCallback((captureId: string, transcript: string) => {
@@ -77,12 +83,13 @@ export default function RecordPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => router.back()}
-            className="p-2 -ml-2 text-gray-600"
-          >
-            <ArrowLeft size={24} />
-          </button>
+          <Link 
+          href="/"
+          className="p-2 -ml-2 text-gray-600 hover:text-gray-900"
+          title="Back to home"
+        >
+          <ArrowLeft size={24} />
+        </Link>
           <div>
             <h1 className="font-semibold text-gray-900">Record Item</h1>
             <p className="text-xs text-gray-500">Zone: {currentZoneId || 'Not selected'}</p>

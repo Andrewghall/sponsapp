@@ -241,25 +241,6 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
         const captureId = uuidv4()
         const idempotencyKey = uuidv4()
 
-        await saveOfflineCapture({
-          id: captureId,
-          idempotencyKey,
-          audioBlob,
-          audioDuration: duration,
-          timestamp: new Date(),
-          projectId,
-          context: {
-            zone: zoneId || '',
-            level: '',
-            room: ''
-          },
-          audioLocalUri: `capture_${Date.now()}.webm`,
-          audioMimeType: audioBlob.type,
-          audioSize: audioBlob.size,
-          syncStatus: 'PENDING',
-          retryCount: 0,
-        })
-
         incrementPending()
 
         if (connectionStatus === 'online') {
