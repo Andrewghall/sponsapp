@@ -5,6 +5,9 @@
 
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import OpenAI from 'openai'
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export interface RetrievedCandidate {
   id: string
@@ -22,6 +25,14 @@ export interface RetrievedCandidate {
 
 const SIMILARITY_THRESHOLD = 0.65
 const MAX_CANDIDATES = 10
+
+async function generateEmbedding(text: string): Promise<number[]> {
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: text,
+  })
+  return response.data[0].embedding
+}
 
 /**
  * Retrieve SPONS candidates for a line item using filtering + pgvector similarity.
@@ -73,14 +84,25 @@ export async function retrieveCandidates(
   // 2. Vector similarity on description (if embedding exists)
   const candidates: RetrievedCandidate[] = []
   if (normalizedFields.description) {
+    // Generate embedding for the description
+    console.log(`[${traceId || 'unknown'}] Generating embedding for description:`, normalizedFields.description)
+    const embedding = await generateEmbedding(normalizedFields.description)
+    console.log(`[${traceId || 'unknown'}] Generated embedding:`, {
+      length: embedding.length,
+      first3: embedding.slice(0, 3),
+      type: typeof embedding,
+      isArray: Array.isArray(embedding)
+    })
+    
     // Get compatible units as PostgreSQL array
     const compatibleUnitsArray = compatibleUnits(unit)
     console.log(`[${traceId || 'unknown'}] Compatible units array:`, compatibleUnitsArray)
     
     // Build query with Prisma.sql (safe parameter binding)
+    const embeddingVector = `[${embedding.join(',')}]`
     let query = Prisma.sql`SELECT 
         id, item_code, description, unit, trade, book, section, rate,
-        (embedding <=> ${normalizedFields.description}::vector) AS similarity
+        (embedding <=> ${embeddingVector}::vector) AS similarity
       FROM spons_items
       WHERE unit = ANY(${compatibleUnitsArray}::text[])`
     
@@ -92,7 +114,7 @@ export async function retrieveCandidates(
       ORDER BY similarity ASC
       LIMIT ${MAX_CANDIDATES}`
     
-    console.log(`[${traceId || 'unknown'}] Executing similarity search`)
+    console.log(`[${traceId || 'unknown'}] Executing similarity search with vector of length ${embedding.length}`)
     
     const similarityResults = await prisma.$queryRaw<Array<{
       id: string
