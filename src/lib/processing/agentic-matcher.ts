@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { retrieveCandidates } from './retrieval'
+import { normalizeObservation, reasonCandidateSelection } from './observation-reasoning'
 import { prisma } from '@/lib/prisma'
 
 const openai = new OpenAI({
@@ -29,6 +30,12 @@ interface MatchResult {
   reasoning: string
   attempts: number
   final_query: string
+  structured_fields: {
+    trade: string
+    asset: string
+    action: string
+    condition: string
+  }
 }
 
 // Step 1: Normalize transcript
@@ -233,25 +240,36 @@ export async function agenticMatcher(
     reasoning: 'No match found'
   }
   let query = ''
+  let structuredFields = {
+    trade: observation.trade as 'Fire' | 'HVAC' | 'Mechanical' | 'Electrical' | 'General',
+    asset: observation.asset_type,
+    action: 'repair',
+    condition: 'defective'
+  }
   
   console.log(`[${traceId}] Starting agentic matching for: ${observation.asset_type} - ${observation.issue}`)
+  
+  // Step 1: Normalize observation to QS-grade
+  console.log(`[${traceId}] Step 1: Normalizing observation to QS-grade`)
+  const normalizedObservation = await normalizeObservation(observation)
+  console.log(`[${traceId}] Normalized: ${normalizedObservation.qs_description}`)
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     attempts++
     
-    // Generate search query
-    query = await generateSearchQuery(observation, attempt)
+    // Generate search query using normalized description
+    query = await generateSearchQuery(normalizedObservation, attempt)
     console.log(`[${traceId}] Attempt ${attempt}: Query="${query}"`)
     
     // Run SPONS search
     const candidates = await retrieveCandidates(
       lineItemId,
       {
-        type: observation.asset_type,
-        category: observation.trade,
-        description: observation.issue,
+        type: normalizedObservation.asset_type,
+        category: normalizedObservation.trade,
+        description: normalizedObservation.qs_description,
         floor: '',
-        location: observation.location || '',
+        location: normalizedObservation.location || '',
         assetCondition: undefined,
         observations: query,
       },
@@ -260,17 +278,29 @@ export async function agenticMatcher(
     
     console.log(`[${traceId}] Found ${candidates.length} candidates`)
     
-    // Evaluate results
-    const evaluation = await evaluateMatchQuality(observation, candidates, query)
+    // Step 2: Candidate reasoning agent
+    console.log(`[${traceId}] Step 2: Running candidate reasoning agent`)
+    const mappedCandidates = candidates.map(c => ({
+      item_code: c.item_code,
+      description: c.description || '',
+      trade: c.trade || 'General',
+      similarity_score: c.similarity_score || 0
+    }))
+    const reasoning = await reasonCandidateSelection(normalizedObservation, mappedCandidates)
     
     // Update best result if this is better
-    if (evaluation.confidence > bestResult.confidence) {
-      bestResult = evaluation
-      console.log(`[${traceId}] New best result: confidence=${evaluation.confidence}`)
+    if (reasoning.confidence > bestResult.confidence) {
+      bestResult = {
+        bestCandidate: reasoning.selected_candidate,
+        confidence: reasoning.confidence,
+        reasoning: reasoning.reasoning
+      }
+      structuredFields = reasoning.structured_fields
+      console.log(`[${traceId}] New best result: confidence=${reasoning.confidence}`)
     }
     
     // Check if we have a good match
-    if (evaluation.confidence >= 0.75) {
+    if (reasoning.confidence >= 0.75) {
       console.log(`[${traceId}] High confidence match found, stopping`)
       break
     }
@@ -278,7 +308,6 @@ export async function agenticMatcher(
     // If not last attempt, prepare for retry
     if (attempt < maxAttempts) {
       console.log(`[${traceId}] Low confidence, retrying...`)
-      // The next iteration will generate a new query
     }
   }
   
@@ -289,7 +318,8 @@ export async function agenticMatcher(
     confidence: bestResult.confidence,
     reasoning: bestResult.reasoning,
     attempts,
-    final_query: query
+    final_query: query,
+    structured_fields: structuredFields
   }
   
   console.log(`[${traceId}] Final result: ${result.spons_code || 'NO MATCH'} (confidence: ${result.confidence})`)
@@ -336,7 +366,13 @@ export async function processObservationsAgentic(
         confidence: 0,
         reasoning: error instanceof Error ? error.message : 'Matching failed',
         attempts: 0,
-        final_query: ''
+        final_query: '',
+        structured_fields: {
+        trade: observation.trade as 'Fire' | 'HVAC' | 'Mechanical' | 'Electrical' | 'General',
+        asset: observation.asset_type,
+        action: 'repair',
+        condition: 'defective'
+      }
       }
       results.push(fallbackResult)
       
