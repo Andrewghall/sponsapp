@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { splitTranscriptIntoObservations } from '@/lib/processing/observation-splitter'
-import { runAgenticLoop } from '@/lib/processing/agentic-matcher'
+import { runCompleteAgenticLoop } from '@/lib/processing/final-agentic-loop'
 import { normalizeTranscript, detectMultipleAssets } from '@/lib/processing/agentic-matcher'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -169,10 +169,10 @@ export async function POST(request: NextRequest) {
           continue
         }
         
-        // Run complete agentic loop: PLAN → ACT → VERIFY → COMMIT
-        await runAgenticLoop(observation, lineItem.id, traceId)
+        // Run complete agentic loop: Clean → Validate → Retrieve → Decide → Persist
+        await runCompleteAgenticLoop(observation, lineItem.id, traceId)
         
-        console.log(`[${traceId}] Completed agentic loop for observation`)
+        console.log(`[${traceId}] Completed complete agentic loop for observation`)
         
       } catch (error) {
         console.error(`[${traceId}] Error processing observation ${lineItem.id}:`, error)
