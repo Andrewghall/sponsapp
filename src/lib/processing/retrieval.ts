@@ -3,6 +3,7 @@
 // - Vector similarity on description
 // - Return top N candidates with scores
 
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export interface RetrievedCandidate {
@@ -62,7 +63,22 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
   // 2. Vector similarity on description (if embedding exists)
   const candidates: RetrievedCandidate[] = []
   if (normalized.description) {
-    // Use pgvector <->> operator for similarity (requires pgvector extension)
+    // Build parameterized query
+    const queryParams: any[] = []
+    let paramIndex = 1
+    
+    let whereClause = 'unit = ANY($' + paramIndex + ')'
+    queryParams.push(compatibleUnits(normalized.unit))
+    paramIndex++
+    
+    if (normalized.trade) {
+      whereClause += ' AND trade = $' + paramIndex
+      queryParams.push(normalized.trade)
+      paramIndex++
+    }
+    
+    whereClause += ' AND embedding IS NOT NULL'
+    
     const similarityResults = await prisma.$queryRaw<Array<{
       id: string
       item_code: string
@@ -73,17 +89,16 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
       section?: string
       rate?: number
       similarity: number
-    }>>`
-      SELECT 
+    }>>(
+      Prisma.sql`SELECT 
         id, item_code, description, unit, trade, book, section, rate,
         (embedding <=> ${normalized.description}::vector) AS similarity
       FROM spons_items
-      WHERE 
-        ${normalized.trade ? `trade = '${normalized.trade}' AND` : ''}
-        unit = ANY(${compatibleUnits(normalized.unit)})
+      WHERE ${Prisma.raw(whereClause)}
       ORDER BY similarity ASC
-      LIMIT ${MAX_CANDIDATES}
-    `
+      LIMIT ${MAX_CANDIDATES}`,
+      ...queryParams
+    )
 
     for (const row of similarityResults) {
       const score = 1 - row.similarity // Convert distance to similarity
