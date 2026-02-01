@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { FolderOpen, Plus, ChevronRight } from "lucide-react";
+import { FolderOpen, Plus, ChevronRight, Trash2, BarChart3, CheckCircle, AlertCircle, Clock, Search } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
 async function getProjects() {
   try {
-    return await prisma.projects.findMany({
+    const projects = await prisma.projects.findMany({
       orderBy: { updated_at: 'desc' },
       include: {
         _count: {
@@ -14,28 +14,215 @@ async function getProjects() {
         },
       },
     });
+
+    // Get stats for each project
+    const projectsWithStats = await Promise.all(
+      projects.map(async (project) => {
+        // Simplified stats - just get total line items count
+        const lineItemCount = await prisma.line_items.count({
+          where: { project_id: project.id }
+        });
+
+        return {
+          ...project,
+          _stats: { 
+            matched: 0, 
+            pending: lineItemCount, 
+            failed: 0 
+          }
+        };
+      })
+    );
+
+    return projectsWithStats;
   } catch (error) {
     console.error('Failed to fetch projects:', error);
     return [];
   }
 }
 
+async function deleteProject(projectId: string) {
+  try {
+    // First, delete all related data in the correct order
+    await prisma.audit_entries.deleteMany({
+      where: {
+        line_items: {
+          project_id: projectId
+        }
+      }
+    });
+
+    await prisma.spons_matches.deleteMany({
+      where: {
+        line_items: {
+          project_id: projectId
+        }
+      }
+    });
+
+    await prisma.line_items.deleteMany({
+      where: { project_id: projectId }
+    });
+
+    // Note: captures table doesn't have project_id, so we need to handle this differently
+    // For now, just delete zones and project
+    await prisma.zones.deleteMany({
+      where: { project_id: projectId }
+    });
+
+    // Delete any Supabase storage files for this project
+    // This would need to be implemented based on your Supabase setup
+    // For now, just delete the project record
+    await prisma.projects.delete({
+      where: { id: projectId }
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete project:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
 export default async function Home() {
   const projects = await getProjects();
 
+  // Calculate total stats
+  const totalStats = projects.reduce((acc, project) => ({
+    projects: projects.length,
+    lineItems: acc.lineItems + (project._count?.line_items || 0),
+    matched: acc.matched + (project._stats?.matched || 0),
+    pending: acc.pending + (project._stats?.pending || 0),
+    failed: acc.failed + (project._stats?.failed || 0),
+  }), { projects: 0, lineItems: 0, matched: 0, pending: 0, failed: 0 });
+
   return (
-    <div className="p-4 pb-24">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-        <p className="text-sm text-gray-500 mt-1">Select a project to start surveying</p>
+      <header className="bg-white border-b border-gray-200 px-4 py-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">SPONS Mobile</h1>
+              <p className="text-gray-600 mt-1">Agentic Inspection Platform</p>
+            </div>
+            <Link
+              href="/projects/new"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              <Plus size={20} />
+              New Project
+            </Link>
+          </div>
+        </div>
       </header>
 
-      {/* Projects list */}
-      <div className="space-y-3">
+      {/* Stats Overview */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <BarChart3 size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Projects</p>
+                <p className="text-2xl font-bold text-gray-900">{totalStats.projects}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <BarChart3 size={20} className="text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Items</p>
+                <p className="text-2xl font-bold text-gray-900">{totalStats.lineItems}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckCircle size={20} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Matched</p>
+                <p className="text-2xl font-bold text-gray-900">{totalStats.matched}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Clock size={20} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-gray-900">{totalStats.pending}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <AlertCircle size={20} className="text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Failed</p>
+                <p className="text-2xl font-bold text-gray-900">{totalStats.failed}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Welcome Section */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
+          <h2 className="text-2xl font-bold mb-2">Welcome to SPONS Mobile</h2>
+          <p className="text-blue-100 mb-4">
+            Your agentic inspection platform for capturing, processing, and exporting SPONS-ready line items.
+            Walk sites, record observations, and let AI handle the rest.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+              <h3 className="font-semibold mb-1">🎤 Record</h3>
+              <p className="text-sm text-blue-100">Capture voice observations with mobile-first interface</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+              <h3 className="font-semibold mb-1">🧠 Process</h3>
+              <p className="text-sm text-blue-100">AI automatically splits, matches, and categorizes items</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-lg p-4">
+              <h3 className="font-semibold mb-1">📊 Export</h3>
+              <p className="text-sm text-blue-100">Generate SPONS-ready spreadsheets with confidence scores</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Projects List */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">Projects</h2>
+          <div className="relative">
+            <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search projects..."
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
         {projects.length === 0 ? (
-          /* Empty state */
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
             <FolderOpen size={48} className="mx-auto text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-700">No projects yet</h3>
             <p className="text-sm text-gray-500 mt-1 mb-4">
@@ -46,46 +233,81 @@ export default async function Home() {
               className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700"
             >
               <Plus size={20} />
-              New Project
+              Create your first project
             </Link>
           </div>
         ) : (
-          /* Project cards */
-          projects.map((project) => (
-            <Link
-              key={project.id}
-              href={`/projects/${project.id}`}
-              className="block bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
-                  {project.client && (
-                    <p className="text-sm text-gray-500 truncate">{project.client}</p>
-                  )}
-                  {project.owner_name && (
-                    <p className="text-xs text-blue-600 mt-1">Owner: {project.owner_name}</p>
-                  )}
-                  <div className="flex gap-4 mt-2 text-xs text-gray-400">
-                    <span>{project._count.line_items} items</span>
-                    <span>{project._count.zones} zones</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map((project) => (
+              <div key={project.id} className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 truncate">{project.name}</h3>
+                      {project.client && (
+                        <p className="text-sm text-gray-600 mt-1">{project.client}</p>
+                      )}
+                      {project.site_address && (
+                        <p className="text-sm text-gray-500 mt-1 truncate">{project.site_address}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Link
+                        href={`/projects/${project.id}/capture`}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        title="Open project"
+                      >
+                        <BarChart3 size={16} />
+                      </Link>
+                      <form
+                        action={`/api/projects/${project.id}/delete`}
+                        method="POST"
+                        onSubmit={(e) => {
+                          if (!confirm('Are you sure you want to delete this project and all its data? This action cannot be undone.')) {
+                            e.preventDefault()
+                          }
+                        }}
+                      >
+                        <button
+                          type="submit"
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          title="Delete project"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="text-center">
+                      <p className="font-medium text-gray-900">{project._count?.line_items || 0}</p>
+                      <p className="text-gray-500">Items</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-gray-900">{project._count?.zones || 0}</p>
+                      <p className="text-gray-500">Zones</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-gray-900">{project._stats?.matched || 0}</p>
+                      <p className="text-gray-500">Matched</p>
+                    </div>
                   </div>
                 </div>
-                <ChevronRight size={20} className="text-gray-400 flex-shrink-0" />
+                
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+                  <Link
+                    href={`/projects/${project.id}/capture`}
+                    className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium text-center block"
+                  >
+                    Open Project
+                  </Link>
+                </div>
               </div>
-            </Link>
-          ))
+            ))}
+          </div>
         )}
       </div>
-
-      {/* FAB for new project */}
-      <Link
-        href="/projects/new"
-        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all"
-        aria-label="New project"
-      >
-        <Plus size={28} />
-      </Link>
     </div>
   );
 }
