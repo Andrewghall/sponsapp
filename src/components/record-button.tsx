@@ -35,6 +35,22 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
   const rafIdRef = useRef<number | null>(null)
   const [level, setLevel] = useState(0)
 
+  // Poll for status updates after transcription
+  const pollForStatus = useCallback(async (captureId: string) => {
+    try {
+      const response = await fetch(`/api/captures/${captureId}/status`)
+      if (response.ok) {
+        const data = await response.json()
+        // Update UI based on status
+        if (data.status === 'PASS2_COMPLETE' || data.status === 'PENDING_QS_REVIEW' || data.status === 'APPROVED') {
+          onStatusChange?.('Ready')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to poll status:', error)
+    }
+  }, [onStatusChange])
+
   useEffect(() => {
     return () => {
       if (streamRef.current) {
@@ -265,28 +281,34 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
             const transcript = typeof data?.transcript === 'string' ? data.transcript : ''
             if (transcript) {
               setLiveTranscript(transcript)
-              onStatusChange?.('Transcribed')
+              onStatusChange?.('Processing…')
               onCaptureCompleteWithTranscript?.(captureId, transcript)
+              
+              // Start polling for status updates
+              setTimeout(() => {
+                pollForStatus(captureId)
+              }, 2000)
             } else {
               onStatusChange?.('Saved (no transcript)')
             }
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e)
             console.error(e)
-            onStatusChange?.(`Saved. Transcription failed: ${message}`)
+            onStatusChange?.(`Error: ${message}`)
+          } finally {
+            setRecordingStatus('idle')
           }
         } else {
           onStatusChange?.('Saved offline (will sync later)')
         }
 
-        setRecordingStatus('idle')
         onCaptureComplete(captureId)
         resolve()
       }
 
       mediaRecorderRef.current!.stop()
     })
-  }, [projectId, zoneId, setRecordingStatus, incrementPending, onCaptureComplete, onCaptureCompleteWithTranscript, onStatusChange, stopMetering, connectionStatus, setLiveTranscript])
+  }, [projectId, zoneId, setRecordingStatus, incrementPending, onCaptureComplete, onCaptureCompleteWithTranscript, onStatusChange, stopMetering, connectionStatus, setLiveTranscript, pollForStatus])
 
   const isRecording = recordingStatus === 'recording'
   const isProcessing = recordingStatus === 'processing'
