@@ -18,6 +18,7 @@ interface LineItem {
   sponsCode?: string
   sponsDescription?: string
   sponsCost?: number
+  created_at?: string
 }
 
 export default function ItemsPage() {
@@ -61,6 +62,12 @@ export default function ItemsPage() {
     item.type?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Show all items regardless of status (PENDING_PASS1, PENDING_PASS2, etc.)
+  const sortedItems = [...items].sort((a, b) => {
+    // Sort by created_at descending (newest first) - assuming API returns created_at
+    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+  })
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
@@ -102,7 +109,7 @@ export default function ItemsPage() {
           <div className="text-center py-8">
             <p className="text-gray-500">Loading items...</p>
           </div>
-        ) : filteredItems.length === 0 ? (
+        ) : sortedItems.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500">
               {searchTerm ? 'No items found' : 'No items captured yet'}
@@ -110,17 +117,17 @@ export default function ItemsPage() {
             {!searchTerm && (
               <Link
                 href={`/projects/${projectId}/record`}
-                className="mt-4 inline-flex items-center gap-2 text-blue-600 font-medium"
+                className="inline-flex items-center gap-2 mt-4 text-blue-600 hover:text-blue-700"
               >
-                <Plus size={20} />
-                Record first item
+                <Plus size={16} />
+                Capture first item
               </Link>
             )}
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredItems.map((item) => (
-              <LineCard
+            {sortedItems.map((item) => (
+              <LineCard 
                 key={item.id}
                 id={item.id}
                 status={item.status}

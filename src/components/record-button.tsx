@@ -295,11 +295,13 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
               onStatusChange?.('Saved')
               onCaptureCompleteWithTranscript?.(captureId, transcript)
               
-              // Show toast notification
-              alert('Captured: ' + transcript)
+              // Clear processing state
+              setRecordingStatus('idle')
               
-              // Navigate to items page and refresh
+              // Navigate to items page
               router.push(`/projects/${projectId}/items`)
+              
+              // Force refresh
               router.refresh()
               
               // Start polling for Pass 2 status updates (async, non-blocking)
@@ -308,21 +310,20 @@ export function RecordButton({ projectId, zoneId, onCaptureComplete, onCaptureCo
               }, 2000)
             } else {
               onStatusChange?.('Saved (no transcript)')
-              // Show toast notification
-              alert('Captured (no transcript)')
               
-              // Navigate to items page and refresh even without transcript
+              // Clear processing state
+              setRecordingStatus('idle')
+              
+              // Navigate to items page
               router.push(`/projects/${projectId}/items`)
+              
+              // Force refresh
               router.refresh()
             }
           } catch (e) {
             const message = e instanceof Error ? e.message : String(e)
             console.error(e)
             onStatusChange?.(`Error: ${message}`)
-          } finally {
-            setRecordingStatus('idle')
-            // Clear any processing state
-            onStatusChange?.('')
           }
         } else {
           onStatusChange?.('Saved offline (will sync later)')
