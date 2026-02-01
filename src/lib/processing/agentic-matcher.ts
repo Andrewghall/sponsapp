@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import { retrieveCandidates } from './retrieval'
-import { normalizeObservation, reasonCandidateSelection } from './observation-reasoning'
+import { refineObservation, agenticSPONSMatch, verifyMatch } from './agentic-reasoning'
 import { normalizeStructuredFields } from './trade-normalization'
 import { prisma } from '@/lib/prisma'
 
@@ -37,6 +37,8 @@ interface MatchResult {
     action: string
     condition: string
   }
+  work_classification: 'repair' | 'replace' | 'inspect' | 'install' | 'maintain'
+  verification_passed: boolean
 }
 
 // Step 1: Normalize transcript
@@ -227,7 +229,7 @@ async function rewriteQuery(
   return response.choices[0].message.content || originalQuery
 }
 
-// Main agentic matching loop
+// Main agentic matching loop with complete reasoning pipeline
 export async function agenticMatcher(
   observation: Observation,
   lineItemId: string,
@@ -235,42 +237,46 @@ export async function agenticMatcher(
 ): Promise<MatchResult> {
   let attempts = 0
   const maxAttempts = 3
-  let bestResult: { bestCandidate: any | null, confidence: number, reasoning: string } = {
-    bestCandidate: null,
+  let bestResult: MatchResult = {
+    spons_code: null,
+    description: null,
     confidence: 0,
-    reasoning: 'No match found'
+    reasoning: 'No match found',
+    attempts: 0,
+    final_query: '',
+    structured_fields: normalizeStructuredFields({
+      trade: observation.trade,
+      asset: observation.asset_type,
+      action: 'repair',
+      condition: 'defective'
+    }),
+    work_classification: 'inspect',
+    verification_passed: false
   }
-  let query = ''
-  let structuredFields = normalizeStructuredFields({
-    trade: observation.trade,
-    asset: observation.asset_type,
-    action: 'repair',
-    condition: 'defective'
-  })
   
-  console.log(`[${traceId}] Starting agentic matching for: ${observation.asset_type} - ${observation.issue}`)
+  console.log(`[${traceId}] Starting complete agentic reasoning for: ${observation.asset_type} - ${observation.issue}`)
   
-  // Step 1: Normalize observation to QS-grade
-  console.log(`[${traceId}] Step 1: Normalizing observation to QS-grade`)
-  const normalizedObservation = await normalizeObservation(observation)
-  console.log(`[${traceId}] Normalized: ${normalizedObservation.qs_description}`)
+  // Step 1: Refine observation into QS-grade language
+  console.log(`[${traceId}] Step 1: Refining observation to QS-grade`)
+  const refinedObservation = await refineObservation(observation)
+  console.log(`[${traceId}] Refined sentence: ${refinedObservation.refined_sentence}`)
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     attempts++
     
-    // Generate search query using normalized description
-    query = await generateSearchQuery(normalizedObservation, attempt)
+    // Generate search query using refined observation
+    const query = await generateSearchQuery(refinedObservation, attempt)
     console.log(`[${traceId}] Attempt ${attempt}: Query="${query}"`)
     
-    // Run SPONS search
+    // Run SPONS vector search
     const candidates = await retrieveCandidates(
       lineItemId,
       {
-        type: normalizedObservation.asset_type,
-        category: normalizedObservation.trade,
-        description: normalizedObservation.qs_description,
+        type: refinedObservation.asset_type,
+        category: refinedObservation.trade,
+        description: refinedObservation.qs_description,
         floor: '',
-        location: normalizedObservation.location || '',
+        location: refinedObservation.location || '',
         assetCondition: undefined,
         observations: query,
       },
@@ -279,53 +285,52 @@ export async function agenticMatcher(
     
     console.log(`[${traceId}] Found ${candidates.length} candidates`)
     
-    // Step 2: Candidate reasoning agent
-    console.log(`[${traceId}] Step 2: Running candidate reasoning agent`)
+    // Step 2: Agentic SPONS matching with reasoning
+    console.log(`[${traceId}] Step 2: Running agentic SPONS matching`)
     const mappedCandidates = candidates.map(c => ({
       item_code: c.item_code,
       description: c.description || '',
       trade: c.trade || 'General',
       similarity_score: c.similarity_score || 0
     }))
-    const reasoning = await reasonCandidateSelection(normalizedObservation, mappedCandidates)
+    
+    const matchResult = await agenticSPONSMatch(refinedObservation, mappedCandidates)
+    
+    // Step 3: Verification step
+    console.log(`[${traceId}] Step 3: Verifying match quality`)
+    const verification = await verifyMatch(refinedObservation, matchResult)
     
     // Update best result if this is better
-    if (reasoning.confidence > bestResult.confidence) {
+    if (matchResult.confidence > bestResult.confidence) {
       bestResult = {
-        bestCandidate: reasoning.selected_candidate,
-        confidence: reasoning.confidence,
-        reasoning: reasoning.reasoning
+        spons_code: matchResult.selected_candidate?.item_code || null,
+        description: matchResult.selected_candidate?.description || null,
+        confidence: matchResult.confidence,
+        reasoning: matchResult.reasoning,
+        attempts,
+        final_query: query,
+        structured_fields: matchResult.structured_fields,
+        work_classification: matchResult.work_classification,
+        verification_passed: verification.verified
       }
-      structuredFields = reasoning.normalized_fields
-      console.log(`[${traceId}] New best result: confidence=${reasoning.confidence}`)
+      console.log(`[${traceId}] New best result: confidence=${matchResult.confidence}, verified=${verification.verified}`)
     }
     
-    // Check if we have a good match
-    if (reasoning.confidence >= 0.75) {
-      console.log(`[${traceId}] High confidence match found, stopping`)
+    // Check if we have a high-quality verified match
+    if (verification.verified && matchResult.confidence >= 0.75) {
+      console.log(`[${traceId}] High confidence verified match found, stopping`)
       break
     }
     
     // If not last attempt, prepare for retry
     if (attempt < maxAttempts) {
-      console.log(`[${traceId}] Low confidence, retrying...`)
+      console.log(`[${traceId}] Low confidence or unverified, retrying...`)
     }
   }
   
-  // Prepare final result
-  const result: MatchResult = {
-    spons_code: bestResult.bestCandidate?.item_code || null,
-    description: bestResult.bestCandidate?.description || null,
-    confidence: bestResult.confidence,
-    reasoning: bestResult.reasoning,
-    attempts,
-    final_query: query,
-    structured_fields: structuredFields
-  }
+  console.log(`[${traceId}] Final result: ${bestResult.spons_code || 'NO MATCH'} (confidence: ${bestResult.confidence}, verified: ${bestResult.verification_passed})`)
   
-  console.log(`[${traceId}] Final result: ${result.spons_code || 'NO MATCH'} (confidence: ${result.confidence})`)
-  
-  return result
+  return bestResult
 }
 
 // Process multiple observations for a line item
@@ -345,7 +350,7 @@ export async function processObservationsAgentic(
       await prisma.line_items.update({
         where: { id: lineItemId },
         data: {
-          pass2_status: result.confidence >= 0.75 ? 'MATCHED' : 'QS_REVIEW',
+          pass2_status: result.confidence >= 0.75 && result.verification_passed ? 'MATCHED' : 'QS_REVIEW',
           pass2_confidence: result.confidence,
           spons_candidate_code: result.spons_code,
           spons_candidate_label: result.description,
@@ -354,7 +359,7 @@ export async function processObservationsAgentic(
             description: result.description || '',
             score: result.confidence
           }] : [],
-          pass2_error_new: result.confidence < 0.75 ? result.reasoning : null,
+          pass2_error_new: result.confidence < 0.75 || !result.verification_passed ? result.reasoning : null,
         },
       })
     } catch (error) {
@@ -373,7 +378,9 @@ export async function processObservationsAgentic(
           asset: observation.asset_type,
           action: 'repair',
           condition: 'defective'
-        })
+        }),
+        work_classification: 'inspect',
+        verification_passed: false
       }
       results.push(fallbackResult)
       
