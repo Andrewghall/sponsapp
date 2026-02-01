@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
             col_i_rate: 0,
             col_j_quantity: obs.quantity, // Use inferred quantity
             col_k_amount: 0,
-            status: 'PASS_2',
+            status: 'PENDING_PASS2',
             pass2_status: 'PENDING',
             pass2_confidence: 0,
             spons_candidate_code: null,
