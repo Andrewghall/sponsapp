@@ -100,6 +100,19 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Sync results:', results)
+    
+    // For single capture requests, return top-level lineItemId
+    if (captures.length === 1 && results.lineItemIds.length > 0) {
+      const { captureId, lineItemId } = results.lineItemIds[0]
+      return NextResponse.json({
+        success: true,
+        captureId,
+        lineItemId,
+        lineItemIds: results.lineItemIds,
+        serverTimestamp: new Date().toISOString(),
+      })
+    }
+    
     return NextResponse.json({
       success: true,
       ...results,
