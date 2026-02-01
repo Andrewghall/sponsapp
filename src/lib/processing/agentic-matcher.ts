@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { retrieveCandidates } from './retrieval'
 import { normalizeObservation, reasonCandidateSelection } from './observation-reasoning'
+import { normalizeStructuredFields } from './trade-normalization'
 import { prisma } from '@/lib/prisma'
 
 const openai = new OpenAI({
@@ -240,12 +241,12 @@ export async function agenticMatcher(
     reasoning: 'No match found'
   }
   let query = ''
-  let structuredFields = {
-    trade: observation.trade as 'Fire' | 'HVAC' | 'Mechanical' | 'Electrical' | 'General',
+  let structuredFields = normalizeStructuredFields({
+    trade: observation.trade,
     asset: observation.asset_type,
     action: 'repair',
     condition: 'defective'
-  }
+  })
   
   console.log(`[${traceId}] Starting agentic matching for: ${observation.asset_type} - ${observation.issue}`)
   
@@ -295,7 +296,7 @@ export async function agenticMatcher(
         confidence: reasoning.confidence,
         reasoning: reasoning.reasoning
       }
-      structuredFields = reasoning.structured_fields
+      structuredFields = reasoning.normalized_fields
       console.log(`[${traceId}] New best result: confidence=${reasoning.confidence}`)
     }
     
@@ -367,12 +368,12 @@ export async function processObservationsAgentic(
         reasoning: error instanceof Error ? error.message : 'Matching failed',
         attempts: 0,
         final_query: '',
-        structured_fields: {
-        trade: observation.trade as 'Fire' | 'HVAC' | 'Mechanical' | 'Electrical' | 'General',
-        asset: observation.asset_type,
-        action: 'repair',
-        condition: 'defective'
-      }
+        structured_fields: normalizeStructuredFields({
+          trade: observation.trade,
+          asset: observation.asset_type,
+          action: 'repair',
+          condition: 'defective'
+        })
       }
       results.push(fallbackResult)
       

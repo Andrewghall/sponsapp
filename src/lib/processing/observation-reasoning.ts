@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { normalizeStructuredFields } from './trade-normalization'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -54,6 +55,12 @@ interface ReasonedSelection {
   reasoning: string
   structured_fields: {
     trade: string
+    asset: string
+    action: string
+    condition: string
+  }
+  normalized_fields: {
+    trade: 'Fire' | 'HVAC' | 'Mechanical' | 'Electrical' | 'General'
     asset: string
     action: string
     condition: string
@@ -135,6 +142,13 @@ export async function reasonCandidateSelection(
   candidates: SPONSCandidate[]
 ): Promise<ReasonedSelection> {
   if (candidates.length === 0) {
+    const normalizedFields = normalizeStructuredFields({
+      trade: normalizedObservation.trade,
+      asset: normalizedObservation.qs_asset,
+      action: normalizedObservation.qs_action,
+      condition: normalizedObservation.qs_condition
+    })
+    
     return {
       selected_candidate: null,
       confidence: 0,
@@ -144,7 +158,8 @@ export async function reasonCandidateSelection(
         asset: normalizedObservation.qs_asset,
         action: normalizedObservation.qs_action,
         condition: normalizedObservation.qs_condition
-      }
+      },
+      normalized_fields: normalizedFields
     }
   }
 
@@ -201,6 +216,8 @@ Select the best candidate and explain your reasoning.`
     const result = JSON.parse(response.choices[0].message.content || '{}')
     const selectedIndex = result.selected_index || 0
     
+    const normalizedFields = normalizeStructuredFields(result.structured_fields || {})
+    
     return {
       selected_candidate: candidates[selectedIndex],
       confidence: result.confidence || 0.5,
@@ -210,11 +227,19 @@ Select the best candidate and explain your reasoning.`
         asset: normalizedObservation.qs_asset,
         action: normalizedObservation.qs_action,
         condition: normalizedObservation.qs_condition
-      }
+      },
+      normalized_fields: normalizedFields
     }
   } catch (error) {
     console.error('Error reasoning candidate selection:', error)
     // Fallback to first candidate
+    const normalizedFields = normalizeStructuredFields({
+      trade: normalizedObservation.trade,
+      asset: normalizedObservation.qs_asset,
+      action: normalizedObservation.qs_action,
+      condition: normalizedObservation.qs_condition
+    })
+    
     return {
       selected_candidate: candidates[0],
       confidence: 0.5,
@@ -224,7 +249,8 @@ Select the best candidate and explain your reasoning.`
         asset: normalizedObservation.qs_asset,
         action: normalizedObservation.qs_action,
         condition: normalizedObservation.qs_condition
-      }
+      },
+      normalized_fields: normalizedFields
     }
   }
 }
