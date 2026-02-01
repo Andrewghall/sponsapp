@@ -25,7 +25,7 @@ export default function ProjectPage() {
         <div>
           <h1 className="font-semibold text-gray-900">Project</h1>
           <p className="text-xs text-gray-500">ID: {projectId.slice(0, 8)}...</p>
-          <p className="text-xs text-gray-400">Build: 9db916e</p>
+          <p className="text-xs text-gray-400">Build: 8e51601</p>
         </div>
       </header>
 
