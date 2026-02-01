@@ -122,17 +122,14 @@ export async function POST(request: NextRequest) {
         const childLineItem = await prisma.line_items.create({
           data: {
             project_id: projectId,
-            col_a_item: obs.asset_type,
             col_b_type: obs.asset_type,
-            col_c_location: obs.location || '',
-            col_d_trade: obs.trade,
-            col_e_code: '',
-            col_f_description: obs.observation_text, // Use observation_text, not full transcript
+            col_c_category: obs.location || '',
+            col_d_parent: obs.trade,
+            col_e_object: '',
+            col_f_equipment_configuration: obs.observation_text, // Use observation_text, not full transcript
             col_g_description: obs.issue,
-            col_h_unit: 'EA',
-            col_i_rate: 0,
-            col_j_quantity: obs.quantity, // Use inferred quantity
-            col_k_amount: 0,
+            col_h_equipment_present: 'EA',
+            col_i_prefilled_data_correct: '0',
             status: 'PENDING_PASS2',
             pass2_status: 'PENDING',
             pass2_confidence: 0,
@@ -153,7 +150,7 @@ export async function POST(request: NextRequest) {
     
     // Update all to MATCHING status
     await prisma.line_items.updateMany({
-      where: { source_capture_id: captureId },
+      where: { project_id: projectId },
       data: { pass2_status: 'MATCHING' }
     })
     
