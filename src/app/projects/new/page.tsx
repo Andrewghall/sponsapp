@@ -29,14 +29,23 @@ export default function NewProjectPage() {
 
       if (res.ok) {
         const project = await res.json()
-        router.push(`/projects/${project.id}`)
+        console.log('Project created successfully:', project)
+        // Add a small delay to ensure the project is saved before navigation
+        setTimeout(() => {
+          router.push(`/projects/${project.id}`)
+        }, 100)
       } else {
         const data = await res.json()
+        console.error('Project creation failed:', data)
         setError(data.error || 'Failed to create project')
       }
     } catch (err) {
       console.error('Failed to create project:', err)
       setError('Network error - please try again')
+      // Fallback: redirect to home page after error
+      setTimeout(() => {
+        router.push('/')
+      }, 3000)
     } finally {
       setIsSubmitting(false)
     }

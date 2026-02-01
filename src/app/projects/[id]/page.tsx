@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Mic, List, MapPin, Plus, FileSpreadsheet } from 'lucide-react'
@@ -10,11 +10,34 @@ export default function ProjectPage() {
   const params = useParams()
   const router = useRouter()
   const projectId = params.id as string
-  const { setCurrentProject, currentZoneId, setCurrentZone } = useAppStore()
+  const [isStoreReady, setIsStoreReady] = useState(false)
+  
+  // Safely access store with hydration check
+  const store = useAppStore()
+  const { setCurrentProject, currentZoneId, setCurrentZone } = store
 
   useEffect(() => {
-    setCurrentProject(projectId)
+    // Wait for store to be hydrated before using it
+    setIsStoreReady(true)
+    if (projectId) {
+      setCurrentProject(projectId)
+    }
   }, [projectId, setCurrentProject])
+
+  const handleZoneChange = () => {
+    if (isStoreReady) {
+      setCurrentZone('zone-1')
+    }
+  }
+
+  if (!isStoreReady) {
+    // Show loading state while store hydrates
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -45,7 +68,7 @@ export default function ProjectPage() {
             {currentZoneId || 'No zone selected'}
           </p>
           <button
-            onClick={() => setCurrentZone('zone-1')}
+            onClick={handleZoneChange}
             className="mt-2 text-sm text-blue-600"
           >
             Set to Zone 1 (demo)
