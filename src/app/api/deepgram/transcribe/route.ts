@@ -93,14 +93,18 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Auto-trigger Pass 2 (normalisation + retrieval)
-      console.log('Starting Pass 2 for line item:', lineItemId)
+      // Trigger Pass 2 async (non-blocking)
+      console.log('Triggering async Pass 2 for line item:', lineItemId)
       try {
-        await processPass2(lineItemId)
-        console.log('Pass 2 completed for line item:', lineItemId)
-      } catch (pass2Error) {
-        console.error('Pass 2 failed after transcription:', pass2Error)
-        // Continue; UI will show PASS1_COMPLETE and manual retry can be added later
+        // Fire and forget - don't await
+        fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/pass2`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lineItemId }),
+        }).catch(err => console.error('Failed to trigger Pass 2:', err))
+      } catch (error) {
+        console.error('Error triggering Pass 2:', error)
+        // Continue - Pass 2 failure shouldn't break transcription
       }
     }
 

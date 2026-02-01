@@ -10,6 +10,7 @@ import { retrieveCandidates } from './retrieval'
 
 export interface Pass2Result {
   lineItemId: string
+  status: 'PASS2_COMPLETE' | 'UNMATCHED' | 'PENDING_QS_REVIEW' | 'APPROVED'
   normalised: {
     type?: string
     category?: string
@@ -36,8 +37,8 @@ const MANDATORY_FIELDS = [
 ]
 
 // Process a line item through Pass 2
-export async function processPass2(lineItemId: string): Promise<Pass2Result> {
-  console.log('Pass 2: Processing line item:', lineItemId)
+export async function processPass2(lineItemId: string, traceId?: string): Promise<Pass2Result> {
+  console.log(`[${traceId || 'unknown'}] Pass 2: Processing line item:`, lineItemId)
 
   const lineItem = await prisma.line_items.findUnique({
     where: { id: lineItemId },
@@ -132,9 +133,9 @@ export async function processPass2(lineItemId: string): Promise<Pass2Result> {
   let candidates: any[] = []
   if (isValid) {
     try {
-      candidates = await retrieveCandidates(lineItemId)
+      candidates = await retrieveCandidates(lineItemId, normalised, traceId)
     } catch (err) {
-      console.error('Retrieval failed after Pass 2:', err)
+      console.error(`[${traceId || 'unknown'}] Retrieval failed after Pass 2:`, err)
       // Continue; status will remain PASS2_COMPLETE or PENDING_PASS2
     }
   }
@@ -156,8 +157,15 @@ export async function processPass2(lineItemId: string): Promise<Pass2Result> {
     }
   }
 
+  // Determine final status
+  let finalStatus: Pass2Result['status'] = 'UNMATCHED'
+  if (candidates.length > 0) {
+    finalStatus = 'PASS2_COMPLETE'
+  }
+  
   return {
     lineItemId,
+    status: finalStatus,
     normalised,
     unitConversionLogic,
     missingMandatory,

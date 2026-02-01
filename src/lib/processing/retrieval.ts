@@ -27,7 +27,11 @@ const MAX_CANDIDATES = 10
  * Retrieve SPONS candidates for a line item using filtering + pgvector similarity.
  * Stores candidates in spons_matches (is_selected = false) and updates line_item status.
  */
-export async function retrieveCandidates(lineItemId: string): Promise<RetrievedCandidate[]> {
+export async function retrieveCandidates(
+  lineItemId: string,
+  normalized: NormalisedFields,
+  traceId?: string
+): Promise<RetrievedCandidate[]> {
   const lineItem = await prisma.line_items.findUnique({
     where: { id: lineItemId },
     include: {
@@ -65,34 +69,26 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
   if (normalized.description) {
     // Get compatible units as PostgreSQL array
     const compatibleUnitsArray = compatibleUnits(normalized.unit)
-    console.log('Compatible units array:', compatibleUnitsArray)
+    console.log(`[${traceId || 'unknown'}] Compatible units array:`, compatibleUnitsArray)
     
-    // Build SQL string for $queryRawUnsafe
-    let sqlString = `SELECT 
+    // Build query with Prisma.sql (safe parameter binding)
+    let query = Prisma.sql`SELECT 
         id, item_code, description, unit, trade, book, section, rate,
-        (embedding <=> $3::vector) AS similarity
+        (embedding <=> ${normalized.description}::vector) AS similarity
       FROM spons_items
-      WHERE unit = ANY($1::text[])`
-    
-    const params: any[] = [compatibleUnitsArray]
+      WHERE unit = ANY(${compatibleUnitsArray}::text[])`
     
     if (normalized.trade) {
-      sqlString += ` AND trade = $2::text`
-      params.push(normalized.trade)
-    } else {
-      // If no trade, we need to adjust the embedding parameter index
-      sqlString = sqlString.replace('$3::vector', '$2::vector')
+      query = Prisma.sql`${query} AND trade = ${normalized.trade}::text`
     }
     
-    sqlString += ` AND embedding IS NOT NULL ORDER BY similarity ASC LIMIT ${MAX_CANDIDATES}`
+    query = Prisma.sql`${query} AND embedding IS NOT NULL
+      ORDER BY similarity ASC
+      LIMIT ${MAX_CANDIDATES}`
     
-    // Add embedding as last parameter
-    params.push(normalized.description)
+    console.log(`[${traceId || 'unknown'}] Executing similarity search`)
     
-    console.log('SQL string:', sqlString)
-    console.log('Params:', params)
-    
-    const similarityResults = await prisma.$queryRawUnsafe<Array<{
+    const similarityResults = await prisma.$queryRaw<Array<{
       id: string
       item_code: string
       description: string
@@ -102,7 +98,9 @@ export async function retrieveCandidates(lineItemId: string): Promise<RetrievedC
       section?: string
       rate?: number
       similarity: number
-    }>>(sqlString, ...params)
+    }>>(query)
+    
+    console.log(`[${traceId || 'unknown'}] Found ${similarityResults.length} similarity results`)
 
     for (const row of similarityResults) {
       const score = 1 - row.similarity // Convert distance to similarity
