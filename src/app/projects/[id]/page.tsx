@@ -6,11 +6,45 @@ import Link from 'next/link'
 import { ArrowLeft, Mic, List, MapPin, Plus, FileSpreadsheet } from 'lucide-react'
 import { useAppStore } from '@/store'
 
+interface Zone {
+  id: string
+  name: string
+  floor?: string
+  created_at: string
+}
+
+interface LineItem {
+  id: string
+  status: string
+  transcript?: string
+  description?: string
+  type?: string
+  category?: string
+  location?: string
+  floor?: string
+  sponsCode?: string
+  sponsDescription?: string
+  sponsCost?: number
+  created_at?: string
+  pass2_status?: string
+  pass2_confidence?: number
+  context?: {
+    zone: string
+    level: string
+    room: string
+  }
+}
+
 export default function ProjectPage() {
   const params = useParams()
   const router = useRouter()
   const projectId = params.id as string
   const [isStoreReady, setIsStoreReady] = useState(false)
+  
+  // Project data state
+  const [zones, setZones] = useState<Zone[]>([])
+  const [items, setItems] = useState<LineItem[]>([])
+  const [loading, setLoading] = useState(true)
   
   // Safely access store with hydration check
   const store = useAppStore()
@@ -21,8 +55,55 @@ export default function ProjectPage() {
     setIsStoreReady(true)
     if (projectId) {
       setCurrentProject(projectId)
+      fetchProjectData()
     }
   }, [projectId, setCurrentProject])
+
+  // Refresh data when page becomes visible (after recording)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && projectId) {
+        fetchProjectData()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [projectId])
+
+  const fetchProjectData = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch zones and items in parallel
+      const [zonesResponse, itemsResponse] = await Promise.all([
+        fetch(`/api/projects/${projectId}/zones`),
+        fetch(`/api/projects/${projectId}/items`)
+      ])
+
+      // Handle zones data
+      if (zonesResponse.ok) {
+        const zonesData = await zonesResponse.json()
+        console.log('Zones fetched:', zonesData)
+        setZones(zonesData.zones || [])
+      } else {
+        console.error('Failed to fetch zones:', zonesResponse.status)
+      }
+
+      // Handle items data
+      if (itemsResponse.ok) {
+        const itemsData = await itemsResponse.json()
+        console.log('Items fetched:', itemsData)
+        setItems(itemsData.items || [])
+      } else {
+        console.error('Failed to fetch items:', itemsResponse.status)
+      }
+    } catch (error) {
+      console.error('Error fetching project data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleZoneChange = async () => {
     console.log('Zone change button clicked!')
@@ -59,17 +140,8 @@ export default function ProjectPage() {
         setCurrentZone(data.zone.id)
         alert('Zone created successfully!')
         
-        // Re-fetch zones to ensure UI is up to date
-        try {
-          const zonesResponse = await fetch(`/api/projects/${projectId}/zones`)
-          if (zonesResponse.ok) {
-            const zonesData = await zonesResponse.json()
-            console.log('Zones re-fetched:', zonesData)
-            // The UI will update automatically when the zones list is used
-          }
-        } catch (error) {
-          console.error('Failed to re-fetch zones:', error)
-        }
+        // Re-fetch project data to ensure UI is up to date
+        fetchProjectData()
       } catch (error) {
         console.error('Zone creation error:', error)
         alert(`Error creating zone: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -126,6 +198,22 @@ export default function ProjectPage() {
           >
             Set to Zone 1 (demo)
           </button>
+          
+          {/* Show all zones */}
+          {zones.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">All Zones ({zones.length})</h3>
+              <div className="space-y-1">
+                {zones.map((zone) => (
+                  <div key={zone.id} className="text-sm text-gray-600 flex items-center gap-2">
+                    <MapPin size={14} className="text-gray-400" />
+                    <span>{zone.name}</span>
+                    {zone.floor && <span className="text-gray-400">- {zone.floor}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Main Actions */}
@@ -152,18 +240,43 @@ export default function ProjectPage() {
           <h2 className="font-medium text-gray-900 mb-3">Progress</h2>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold text-gray-900">0</p>
+              <p className="text-2xl font-bold text-gray-900">{items.length}</p>
               <p className="text-xs text-gray-500">Captured</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-amber-500">0</p>
+              <p className="text-2xl font-bold text-amber-500">
+                {items.filter(item => item.status === 'pending' || item.pass2_status === 'PENDING').length}
+              </p>
               <p className="text-xs text-gray-500">Pending</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-green-500">0</p>
+              <p className="text-2xl font-bold text-green-500">
+                {items.filter(item => item.status === 'approved' || item.pass2_status === 'COMPLETE').length}
+              </p>
               <p className="text-xs text-gray-500">Approved</p>
             </div>
           </div>
+          
+          {/* Show recent items */}
+          {items.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Recent Items</h3>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {items.slice(-3).reverse().map((item) => (
+                  <div key={item.id} className="text-sm text-gray-600 flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${
+                      item.pass2_status === 'COMPLETE' ? 'bg-green-500' :
+                      item.pass2_status === 'PENDING' ? 'bg-amber-500' :
+                      'bg-gray-400'
+                    }`} />
+                    <span className="truncate">
+                      {item.transcript ? item.transcript.substring(0, 40) + '...' : 'Processing...'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Export */}
