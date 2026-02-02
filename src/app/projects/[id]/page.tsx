@@ -45,6 +45,7 @@ export default function ProjectPage() {
   const [zones, setZones] = useState<Zone[]>([])
   const [items, setItems] = useState<LineItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [showZoneManager, setShowZoneManager] = useState(false)
   
   // Safely access store with hydration check
   const store = useAppStore()
@@ -156,6 +157,58 @@ export default function ProjectPage() {
     }
   }
 
+  // Zone management functions
+  const updateZoneName = async (zoneId: string, newName: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/zones/${zoneId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName })
+      })
+      
+      if (response.ok) {
+        fetchProjectData() // Refresh zones list
+      }
+    } catch (error) {
+      console.error('Failed to update zone name:', error)
+    }
+  }
+
+  const updateZoneFloor = async (zoneId: string, newFloor: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/zones/${zoneId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ floor: newFloor })
+      })
+      
+      if (response.ok) {
+        fetchProjectData() // Refresh zones list
+      }
+    } catch (error) {
+      console.error('Failed to update zone floor:', error)
+    }
+  }
+
+  const deleteZone = async (zoneId: string) => {
+    if (!confirm('Are you sure you want to delete this zone?')) return
+    
+    try {
+      const response = await fetch(`/api/projects/${projectId}/zones/${zoneId}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        fetchProjectData() // Refresh zones list
+        if (currentZoneId === zoneId) {
+          setCurrentZone(null) // Clear current zone if it was deleted
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete zone:', error)
+    }
+  }
+
   if (!isStoreReady) {
     // Show loading state while store hydrates
     return (
@@ -203,19 +256,75 @@ export default function ProjectPage() {
             Set to Zone 1 (demo)
           </button>
           
-          {/* Show all zones */}
+          {/* Show all zones with management */}
           {zones.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-100">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">All Zones ({zones.length})</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-700">All Zones ({zones.length})</h3>
+                <button
+                  onClick={() => setShowZoneManager(!showZoneManager)}
+                  className="text-xs text-blue-600 hover:text-blue-700"
+                >
+                  {showZoneManager ? 'Hide' : 'Manage'}
+                </button>
+              </div>
+              
+              {/* Simple zone list */}
               <div className="space-y-1">
                 {zones.map((zone) => (
-                  <div key={zone.id} className="text-sm text-gray-600 flex items-center gap-2">
-                    <MapPin size={14} className="text-gray-400" />
-                    <span>{zone.name}</span>
-                    {zone.floor && <span className="text-gray-400">- {zone.floor}</span>}
+                  <div key={zone.id} className="text-sm text-gray-600 flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <MapPin size={14} className="text-gray-400" />
+                      <span>{zone.name}</span>
+                      {zone.floor && <span className="text-gray-400">- {zone.floor}</span>}
+                    </div>
+                    <button
+                      onClick={() => setCurrentZone(zone.id)}
+                      className="text-xs text-blue-600 hover:text-blue-700"
+                    >
+                      Select
+                    </button>
                   </div>
                 ))}
               </div>
+              
+              {/* Zone manager when expanded */}
+              {showZoneManager && (
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Zone Management</h4>
+                  <div className="space-y-2">
+                    {zones.map((zone) => (
+                      <div key={zone.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="text"
+                          value={zone.name}
+                          onChange={(e) => updateZoneName(zone.id, e.target.value)}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                        <input
+                          type="text"
+                          value={zone.floor || ''}
+                          onChange={(e) => updateZoneFloor(zone.id, e.target.value)}
+                          placeholder="Floor"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-xs"
+                        />
+                        <button
+                          onClick={() => deleteZone(zone.id)}
+                          className="text-red-600 hover:text-red-700 text-xs"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleZoneChange}
+                    className="mt-2 w-full px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  >
+                    Add New Zone
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
