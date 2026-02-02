@@ -2,12 +2,13 @@
   "name": "sponsapp",
   "version": "0.1.0",
   "private": true,
+  "description": "Agentic Inspection Platform - Deployed: 2025-02-02 00:10",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "postinstall": "prisma generate --schema=./prisma/schema.prisma",
-    "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "start": "next start"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",
