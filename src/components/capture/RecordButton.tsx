@@ -202,6 +202,14 @@ export function RecordButton({
               }
               
               console.log('Transcription complete, Pass 2 triggered')
+              
+              // Set status to complete to trigger modal
+              setStatus('complete')
+              
+              // Show next area prompt ONLY when processing is complete
+              setTimeout(() => {
+                setShowNextAreaPrompt(true)
+              }, 1000)
             } else {
               setStatusMessage('Captured (no transcript)')
               onCaptureComplete?.(captureId)
@@ -220,10 +228,12 @@ export function RecordButton({
             router.refresh()
           }
           
-          // Show next area prompt after a short delay
-          setTimeout(() => {
-            setShowNextAreaPrompt(true)
-          }, 2000)
+          // Show next area prompt ONLY when processing is complete
+          if (status === 'complete') {
+            setTimeout(() => {
+              setShowNextAreaPrompt(true)
+            }, 1000)
+          }
 
         } catch (error) {
           console.error('Failed to save capture:', error)
@@ -279,8 +289,10 @@ export function RecordButton({
     setStatus('idle')
     setStatusMessage('')
     
-    // Reset all recording state for next capture
-    resetRecordingState()
+    // Only reset recording state if NOT processing
+    if (status !== 'processing') {
+      resetRecordingState()
+    }
     
     if (!keepSame) {
       // TODO: Open context selector
@@ -352,17 +364,34 @@ export function RecordButton({
             <div className="flex gap-3">
               <button
                 onClick={() => handleNextArea(true)}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={status === 'processing'}
+                className={cn(
+                  "flex-1 px-4 py-2 rounded-lg transition-colors",
+                  status === 'processing'
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                )}
               >
                 Keep same area
               </button>
               <button
                 onClick={() => handleNextArea(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={status === 'processing'}
+                className={cn(
+                  "flex-1 px-4 py-2 rounded-lg transition-colors",
+                  status === 'processing'
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                )}
               >
                 Change area
               </button>
             </div>
+            {status === 'processing' && (
+              <p className="text-xs text-amber-600 mt-3 text-center">
+                Please wait for processing to complete...
+              </p>
+            )}
           </div>
         </div>
       )}
