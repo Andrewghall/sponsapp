@@ -139,13 +139,17 @@ export default function ItemsPage() {
           {Object.entries(filterCounts).map(([key, count]) => (
             <button
               key={key}
-              onClick={() => setFilter(key as FilterType)}
+              onClick={() => {
+                console.log('Menu button clicked:', key)
+                setFilter(key as FilterType)
+              }}
               className={cn(
-                "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 border-2",
+                "px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 border-2 cursor-pointer",
                 filter === key
                   ? "bg-blue-600 text-white border-blue-600 shadow-md"
                   : "bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50"
               )}
+              style={{ pointerEvents: 'auto' }}
             >
               <div className="flex items-center gap-2">
                 {key === 'all' && <span className="text-base">📋</span>}
