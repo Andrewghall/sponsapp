@@ -45,27 +45,175 @@ export async function POST(request: NextRequest) {
       throw new Error('Transcription failed: No transcript returned')
     }
 
-    // Update capture with transcript
+    // Update capture with transcript segment (append-only)
     if (captureId) {
-      const data = {
-        transcript: result.transcript,
-        transcribed_at: new Date(),
-        raw_quantities: extractQuantities(result.transcript),
-        raw_components: extractComponents(result.transcript),
-      }
-
       const existing = await prisma.captures.findUnique({ where: { id: captureId } })
       if (existing) {
+        // Append new transcript to existing transcript
+        const fullTranscript = existing.transcript ? `${existing.transcript}\n${result.transcript}` : result.transcript
+        const segmentIndex = (existing.transcript?.split('\n').length || 0)
+        
+        // Create segment ID for idempotency
+        const segmentId = `${captureId}-segment-${segmentIndex}`
+        
+        // Check if this segment was already processed
+        const existingSegment = await prisma.line_items.findFirst({
+          where: {
+            // Use a field to track processed segments - we'll use raw_transcript as segment identifier
+            raw_transcript: segmentId
+          }
+        })
+        
+        if (existingSegment) {
+          console.log(`Segment already processed: ${segmentId}`)
+          return NextResponse.json({ 
+            transcript: result.transcript,
+            segmentId,
+            segmentIndex,
+            alreadyProcessed: true
+          })
+        }
+        
+        // Update capture with full transcript (append-only)
+        const data = {
+          transcript: fullTranscript,
+          transcribed_at: new Date(),
+          raw_quantities: extractQuantities(result.transcript),
+          raw_components: extractComponents(result.transcript),
+        }
+        
         await prisma.captures.update({
           where: { id: captureId },
           data,
         })
+        
+        // Process only this segment for observations
+        console.log('Processing segment:', segmentId, 'transcript:', result.transcript)
+        const observations = await splitTranscriptIntoObservations(result.transcript)
+        console.log('Split into observations:', observations)
+
+        // Create or update line items for each observation
+        if (lineItemId && observations.length > 0) {
+          // Get the original line item to copy project and zone info
+          const originalLineItem = await prisma.line_items.findUnique({ 
+            where: { id: lineItemId } 
+          })
+          
+          if (!originalLineItem) {
+            throw new Error('Original line item not found')
+          }
+
+          // If this is the first observation, update the original line item
+          const firstObservation = observations[0]
+          await prisma.line_items.update({
+            where: { id: lineItemId },
+            data: {
+              status: 'PASS1_COMPLETE',
+              raw_transcript: segmentId, // Store segment ID for idempotency
+              transcript_timestamp: new Date(),
+              col_b_type: firstObservation.asset_type,
+              col_e_object: firstObservation.location || undefined,
+              col_g_description: firstObservation.issue,
+            },
+          })
+
+          // Create additional line items for remaining observations
+          for (let i = 1; i < observations.length; i++) {
+            const obs = observations[i]
+            
+            // Create dedupe key to prevent duplicates
+            const normalizedText = `${obs.asset_type?.toLowerCase().trim() || ''}-${obs.issue?.toLowerCase().trim() || ''}-${obs.location?.toLowerCase().trim() || ''}`
+            const dedupeKey = `${segmentId}-${normalizedText}`
+            
+            // Check if this observation already exists
+            const existingLineItem = await prisma.line_items.findFirst({
+              where: {
+                project_id: originalLineItem.project_id,
+                zone_id: originalLineItem.zone_id,
+                col_b_type: obs.asset_type,
+                col_g_description: obs.issue,
+                col_e_object: obs.location || undefined,
+              }
+            })
+            
+            if (existingLineItem) {
+              console.log(`Skipping duplicate observation: ${dedupeKey}`)
+              continue
+            }
+            
+            const newLineItem = await prisma.line_items.create({
+              data: {
+                project_id: originalLineItem.project_id,
+                zone_id: originalLineItem.zone_id,
+                status: 'PASS1_COMPLETE',
+                raw_transcript: segmentId, // Store segment ID for idempotency
+                transcript_timestamp: new Date(),
+                col_b_type: obs.asset_type,
+                col_e_object: obs.location || undefined,
+                col_g_description: obs.issue,
+              },
+            })
+
+            // Create audit entry for new line item
+            await prisma.audit_entries.create({
+              data: {
+                line_item_id: newLineItem.id,
+                action: 'TRANSCRIBED',
+                spoken_sentence: `${obs.asset_type} - ${obs.issue}`,
+              },
+            })
+
+            // Trigger Pass 2 for new line item
+            console.log('Triggering async Pass 2 for new line item:', newLineItem.id)
+            try {
+              const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
+              fetch(`${base}/api/pass2`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lineItemId: newLineItem.id }),
+              }).catch(err => console.error('Failed to trigger Pass 2:', err))
+            } catch (error) {
+              console.error('Error triggering Pass 2:', error)
+            }
+          }
+
+          // Trigger Pass 2 for original line item
+          console.log('Triggering async Pass 2 for original line item:', lineItemId)
+          try {
+            const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
+            fetch(`${base}/api/pass2`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lineItemId }),
+            }).catch(err => console.error('Failed to trigger Pass 2:', err))
+          } catch (error) {
+            console.error('Error triggering Pass 2:', error)
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          transcript: result.transcript,
+          segmentId,
+          segmentIndex,
+          confidence: result.confidence,
+          rawQuantities: extractQuantities(result.transcript),
+          rawComponents: extractComponents(result.transcript),
+        })
       } else {
+        // Handle case where capture doesn't exist (create new capture)
         if (!lineItemId) {
           return NextResponse.json(
             { error: 'captureId not found; lineItemId is required to create capture' },
             { status: 400 }
           )
+        }
+
+        const data = {
+          transcript: result.transcript,
+          transcribed_at: new Date(),
+          raw_quantities: extractQuantities(result.transcript),
+          raw_components: extractComponents(result.transcript),
         }
 
         await prisma.captures.create({
@@ -75,124 +223,44 @@ export async function POST(request: NextRequest) {
             ...data,
           },
         })
-      }
-    }
 
-    // Split transcript into observations
-    console.log('Splitting transcript into observations:', result.transcript)
-    const observations = await splitTranscriptIntoObservations(result.transcript)
-    console.log('Split into observations:', observations)
-
-    // Create or update line items for each observation
-    if (lineItemId && observations.length > 0) {
-      // Get the original line item to copy project and zone info
-      const originalLineItem = await prisma.line_items.findUnique({ 
-        where: { id: lineItemId } 
-      })
-      
-      if (!originalLineItem) {
-        throw new Error('Original line item not found')
-      }
-
-      // If this is the first observation, update the original line item
-      const firstObservation = observations[0]
-      await prisma.line_items.update({
-        where: { id: lineItemId },
-        data: {
-          status: 'PASS1_COMPLETE',
-          raw_transcript: result.transcript,
-          transcript_timestamp: new Date(),
-          col_b_type: firstObservation.asset_type,
-          col_e_object: firstObservation.location || undefined,
-          col_g_description: firstObservation.issue,
-        },
-      })
-
-      // Create additional line items for remaining observations
-      for (let i = 1; i < observations.length; i++) {
-        const obs = observations[i]
+        // Process as single segment for new capture
+        const segmentId = `${captureId}-segment-0`
+        const observations = await splitTranscriptIntoObservations(result.transcript)
         
-        // Create dedupe key to prevent duplicates
-        const normalizedText = `${obs.asset_type?.toLowerCase().trim() || ''}-${obs.issue?.toLowerCase().trim() || ''}-${obs.location?.toLowerCase().trim() || ''}`
-        const dedupeKey = `${captureId}-${normalizedText}`
-        
-        // Check if this observation already exists
-        const existingLineItem = await prisma.line_items.findFirst({
-          where: {
-            project_id: originalLineItem.project_id,
-            zone_id: originalLineItem.zone_id,
-            col_b_type: obs.asset_type,
-            col_g_description: obs.issue,
-            col_e_object: obs.location || undefined,
+        if (observations.length > 0) {
+          const originalLineItem = await prisma.line_items.findUnique({ 
+            where: { id: lineItemId } 
+          })
+          
+          if (originalLineItem) {
+            // Update original line item with first observation
+            const firstObservation = observations[0]
+            await prisma.line_items.update({
+              where: { id: lineItemId },
+              data: {
+                status: 'PASS1_COMPLETE',
+                raw_transcript: segmentId,
+                transcript_timestamp: new Date(),
+                col_b_type: firstObservation.asset_type,
+                col_e_object: firstObservation.location || undefined,
+                col_g_description: firstObservation.issue,
+              },
+            })
+
+            // Trigger Pass 2
+            try {
+              const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
+              fetch(`${base}/api/pass2`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lineItemId }),
+              }).catch(err => console.error('Failed to trigger Pass 2:', err))
+            } catch (error) {
+              console.error('Error triggering Pass 2:', error)
+            }
           }
-        })
-        
-        if (existingLineItem) {
-          console.log(`Skipping duplicate observation: ${dedupeKey}`)
-          continue
         }
-        
-        const newLineItem = await prisma.line_items.create({
-          data: {
-            project_id: originalLineItem.project_id,
-            zone_id: originalLineItem.zone_id,
-            status: 'PASS1_COMPLETE',
-            raw_transcript: result.transcript,
-            transcript_timestamp: new Date(),
-            col_b_type: obs.asset_type,
-            col_e_object: obs.location || undefined,
-            col_g_description: obs.issue,
-          },
-        })
-
-        // Create audit entry for new line item
-        await prisma.audit_entries.create({
-          data: {
-            line_item_id: newLineItem.id,
-            action: 'TRANSCRIBED',
-            spoken_sentence: `${obs.asset_type} - ${obs.issue}`,
-          },
-        })
-
-        // Trigger Pass 2 for new line item
-        console.log('Triggering async Pass 2 for new line item:', newLineItem.id)
-        try {
-          const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
-          fetch(`${base}/api/pass2`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lineItemId: newLineItem.id }),
-          }).catch(err => console.error('Failed to trigger Pass 2:', err))
-        } catch (error) {
-          console.error('Error triggering Pass 2:', error)
-        }
-      }
-
-      // Create audit entry for first line item
-      await prisma.audit_entries.create({
-        data: {
-          line_item_id: lineItemId,
-          action: 'TRANSCRIBED',
-          spoken_sentence: `${firstObservation.asset_type} - ${firstObservation.issue}`,
-        },
-      })
-
-      // Trigger Agentic Assessment
-      console.log('Triggering agentic assessment for capture:', captureId)
-      try {
-        const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
-        fetch(`${base}/api/agentic-assessment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            projectId: originalLineItem.project_id,
-            captureId,
-            lineItemId: lineItemId,
-            transcript: result.transcript 
-          }),
-        }).catch(err => console.error('Failed to trigger agentic assessment:', err))
-      } catch (error) {
-        console.error('Error triggering agentic assessment:', error)
       }
     }
 
