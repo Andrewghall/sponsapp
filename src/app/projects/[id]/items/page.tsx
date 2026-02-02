@@ -140,7 +140,7 @@ export default function ItemsPage() {
             <button
               key={key}
               onClick={() => {
-                console.log('Menu button clicked:', key)
+                console.log('Menu button clicked:', key, 'Current filter:', filter)
                 setFilter(key as FilterType)
               }}
               className={cn(
