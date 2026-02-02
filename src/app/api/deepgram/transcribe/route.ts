@@ -111,6 +111,27 @@ export async function POST(request: NextRequest) {
       // Create additional line items for remaining observations
       for (let i = 1; i < observations.length; i++) {
         const obs = observations[i]
+        
+        // Create dedupe key to prevent duplicates
+        const normalizedText = `${obs.asset_type?.toLowerCase().trim() || ''}-${obs.issue?.toLowerCase().trim() || ''}-${obs.location?.toLowerCase().trim() || ''}`
+        const dedupeKey = `${captureId}-${normalizedText}`
+        
+        // Check if this observation already exists
+        const existingLineItem = await prisma.line_items.findFirst({
+          where: {
+            project_id: originalLineItem.project_id,
+            zone_id: originalLineItem.zone_id,
+            col_b_type: obs.asset_type,
+            col_g_description: obs.issue,
+            col_e_object: obs.location || undefined,
+          }
+        })
+        
+        if (existingLineItem) {
+          console.log(`Skipping duplicate observation: ${dedupeKey}`)
+          continue
+        }
+        
         const newLineItem = await prisma.line_items.create({
           data: {
             project_id: originalLineItem.project_id,

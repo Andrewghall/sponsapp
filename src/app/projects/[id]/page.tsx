@@ -142,6 +142,9 @@ export default function ProjectPage() {
         
         // Re-fetch project data to ensure UI is up to date
         fetchProjectData()
+        
+        // Refresh home page to update project counts
+        router.refresh()
       } catch (error) {
         console.error('Zone creation error:', error)
         alert(`Error creating zone: ${error instanceof Error ? error.message : 'Unknown error'}`)
