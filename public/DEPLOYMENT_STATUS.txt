@@ -1,0 +1,6 @@
+Deployment triggered at 2025-02-02 00:12
+All fixes included:
+- Capture RecordButton full pipeline
+- Project summary counts fixed
+- Recording state reset issues resolved
+- Zones persistence working
