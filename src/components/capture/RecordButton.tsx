@@ -308,8 +308,16 @@ export function RecordButton({
 
   return (
     <>
-      {/* Status Message - DISABLED to prevent black box issue */}
       <div className="flex flex-col items-center gap-6">
+
+      {/* Status Message */}
+      {statusMessage && status !== 'idle' && (
+        <div className="text-center">
+          <div className="text-sm font-medium text-blue-600">
+            {statusMessage}
+          </div>
+        </div>
+      )}
 
       {/* Recording Timer */}
       {isRecording && (
