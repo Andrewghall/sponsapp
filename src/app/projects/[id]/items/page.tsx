@@ -114,22 +114,21 @@ export default function ItemsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link 
-              href="/"
-              className="p-2 -ml-2 text-gray-600 hover:text-gray-900"
-              title="Back to home"
-            >
-              <ArrowLeft size={24} />
-            </Link>
-            <div className="flex-1">
-              <h1 className="font-semibold text-gray-900">Items</h1>
-              <p className="text-sm text-gray-500">
-                {filteredItems.length} of {items.length} items
-              </p>
-            </div>
+        <div className="flex items-center gap-3">
+          <Link 
+            href="/"
+            className="p-2 -ml-2 text-gray-600 hover:text-gray-900"
+            title="Back to home"
+          >
+            <ArrowLeft size={24} />
+          </Link>
+          <div className="flex-1">
+            <h1 className="font-semibold text-gray-900">Items</h1>
+            <p className="text-sm text-gray-500">
+              {filteredItems.length} of {items.length} items
+            </p>
           </div>
+          <div className="text-xs text-red-600 font-bold">v1.42</div>
         </div>
       </header>
 
@@ -140,7 +139,7 @@ export default function ItemsPage() {
             <button
               key={key}
               onClick={() => {
-                console.log('Menu button clicked:', key, 'Current filter:', filter)
+                console.log('Menu button clicked:', key, 'Current filter:', filter, 'Version: 1.42')
                 setFilter(key as FilterType)
               }}
               className={cn(
