@@ -87,18 +87,126 @@ export function RecordButton({
 
         try {
           if (connectionStatus === 'online') {
-            // Process online when connection is good
-            setStatusMessage('Processing online...')
-            // TODO: Implement online processing - for now save locally but don't show "offline"
-            const capture = await createOfflineCapture(projectId, context, audioBlob, duration)
-            setStatusMessage('Processing...')
-            setStatus('complete')
+            // Process online with full pipeline like the main record-button
+            setStatusMessage('Uploading…')
             
-            onCaptureComplete?.(capture.id)
+            const audioBase64 = await new Promise<string>((resolveBase64, rejectBase64) => {
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                const result = reader.result
+                if (typeof result !== 'string') return rejectBase64(new Error('Failed to encode audio'))
+                const commaIndex = result.indexOf(',')
+                resolveBase64(commaIndex >= 0 ? result.slice(commaIndex + 1) : result)
+              }
+              reader.onerror = () => rejectBase64(new Error('Failed to read audio blob'))
+              reader.readAsDataURL(audioBlob)
+            })
+
+            const captureId = uuidv4()
+            const idempotencyKey = uuidv4()
+
+            const syncRes = await fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                captures: [
+                  {
+                    id: captureId,
+                    idempotencyKey,
+                    audioBase64,
+                    audioDuration: duration,
+                    timestamp: new Date().toISOString(),
+                    projectId,
+                    transcript: '',
+                    context: {
+                      zone: context.zone || '',
+                      level: context.level || '',
+                      room: context.room || ''
+                    }
+                  },
+                ],
+              }),
+            })
+
+            if (!syncRes.ok) {
+              const data = await syncRes.json().catch(() => ({}))
+              const msg = (data?.error as string | undefined) || 'Upload failed'
+              throw new Error(`${msg} (HTTP ${syncRes.status})`)
+            }
+
+            const syncData = await syncRes.json()
+            console.log('Sync response:', syncData)
             
-            // Trigger sync immediately since we're online
-            const syncManager = new SyncManager()
-            syncManager.processPendingCaptures()
+            // Handle both formats: top-level lineItemId OR lineItemIds array
+            let lineItemId: string | undefined
+            if (syncData?.lineItemId) {
+              lineItemId = syncData.lineItemId
+              console.log('Using top-level lineItemId:', lineItemId)
+            }
+            // Fall back to lineItemIds array
+            else if (syncData?.lineItemIds && Array.isArray(syncData.lineItemIds)) {
+              const lineItem = syncData.lineItemIds.find((m: any) => m.captureId === captureId)
+              lineItemId = lineItem?.lineItemId
+              console.log('Found lineItemId in lineItemIds array:', lineItemId)
+            }
+
+            console.log('Final lineItemId:', { lineItemId, captureId })
+
+            if (!lineItemId) {
+              throw new Error('Sync did not return lineItemId for this capture')
+            }
+
+            setStatusMessage('Transcribing…')
+            const formData = new FormData()
+            formData.append('audio', new File([audioBlob], `${captureId}.webm`, { type: 'audio/webm' }))
+            formData.append('captureId', captureId)
+            formData.append('lineItemId', lineItemId)
+
+            console.log('Sending transcription request for:', { captureId, lineItemId, audioBlobSize: audioBlob.size })
+            const res = await fetch('/api/deepgram/transcribe', {
+              method: 'POST',
+              body: formData,
+            })
+
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}))
+              const msg =
+                typeof data?.details === 'string'
+                  ? `${data?.error || 'Transcription failed'}: ${data.details}`
+                  : (data?.error as string | undefined) || 'Transcription failed'
+              throw new Error(`${msg} (HTTP ${res.status})`)
+            }
+
+            const data = await res.json()
+            const transcript = typeof data?.transcript === 'string' ? data.transcript : ''
+            console.log('Transcription response:', data)
+            
+            if (transcript) {
+              onSyncStatusChange?.(captureId, transcript)
+              setStatusMessage('Captured')
+              onCaptureComplete?.(captureId)
+              
+              // Set processing state and trigger Pass 2
+              setStatus('processing')
+              
+              // Trigger Pass 2 processing
+              try {
+                const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://sponsapp-prelive.vercel.app'
+                fetch(`${base}/api/pass2`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ lineItemId }),
+                }).catch(err => console.error('Failed to trigger Pass 2:', err))
+              } catch (error) {
+                console.error('Error triggering Pass 2:', error)
+              }
+              
+              console.log('Transcription complete, Pass 2 triggered')
+            } else {
+              setStatusMessage('Captured (no transcript)')
+              onCaptureComplete?.(captureId)
+              setStatus('processing')
+            }
           } else {
             // Only show "Saved offline" when actually offline
             const capture = await createOfflineCapture(projectId, context, audioBlob, duration)
