@@ -54,6 +54,11 @@ export async function processPass2(lineItemId: string, traceId?: string): Promis
     throw new Error('Line item not found')
   }
 
+  // CRITICAL: Check if we're processing the right transcript
+  console.log(`[${traceId || 'unknown'}] Pass 2: Raw transcript:`, lineItem.raw_transcript)
+  console.log(`[${traceId || 'unknown'}] Pass 2: Raw transcript type:`, typeof lineItem.raw_transcript)
+  console.log(`[${traceId || 'unknown'}] Pass 2: Is segment ID?`, lineItem.raw_transcript?.includes('segment-') || false)
+
   const capture = lineItem.captures[0]
   if (!capture) {
     throw new Error('No capture found for line item')
@@ -103,11 +108,26 @@ export async function processPass2(lineItemId: string, traceId?: string): Promis
   let candidates: any[] = []
   if (isValid) {
     try {
+      console.log(`[${traceId || 'unknown'}] Pass 2: Retrieving candidates for trade=${normalised.type}, unit filters applied`)
       candidates = await retrieveCandidates(lineItemId, normalised, traceId)
+      console.log(`[${traceId || 'unknown'}] Pass 2 candidates count = ${candidates.length}`)
+      
+      // Log top 3 candidates
+      if (candidates.length > 0) {
+        const top3 = candidates.slice(0, 3)
+        console.log(`[${traceId || 'unknown'}] Pass 2: Top 3 candidates:`)
+        top3.forEach((candidate, index) => {
+          console.log(`  ${index + 1}. item_code=${candidate.item_code}, confidence=${candidate.confidence}`)
+        })
+      } else {
+        console.log(`[${traceId || 'unknown'}] Pass 2: No candidates found`)
+      }
     } catch (err) {
       console.error(`[${traceId || 'unknown'}] Retrieval failed after Pass 2:`, err)
       // Continue; status will remain PASS2_COMPLETE or PENDING_PASS2
     }
+  } else {
+    console.log(`[${traceId || 'unknown'}] Pass 2: Skipping retrieval - missing mandatory fields:`, missingMandatory)
   }
 
   // If retrieval returned candidates, run agentic selection
@@ -136,21 +156,45 @@ export async function processPass2(lineItemId: string, traceId?: string): Promis
     console.log(`[${traceId || 'unknown'}] Pass 2: No candidates found, status = UNMATCHED`)
   }
 
-  // Update line item with final status
+  // Update line item with final status and SPONS data
+  const updateData: any = {
+    status: finalStatus,
+    col_b_type: normalised.type,
+    col_c_category: normalised.category,
+    col_g_description: normalised.description,
+    col_s_floor: normalised.floor,
+    col_t_location: normalised.location,
+    col_u_asset_condition: normalised.assetCondition,
+    col_y_observations: normalised.observations,
+    unit_conversion_logic: unitConversionLogic,
+  }
+
+  // Add SPONS fields if candidates found
+  if (candidates.length > 0) {
+    const topCandidate = candidates[0]
+    const top5Candidates = candidates.slice(0, 5)
+    
+    updateData.pass2_status = finalStatus === 'PASS2_COMPLETE' ? 'MATCHED' : 'QS_REVIEW'
+    updateData.pass2_confidence = topCandidate.confidence || 0.5
+    updateData.spons_candidate_code = topCandidate.item_code
+    updateData.spons_candidate_label = topCandidate.description || topCandidate.item_code
+    updateData.spons_candidates = JSON.stringify(top5Candidates)
+    updateData.pass2_completed_at = new Date()
+    
+    console.log(`[${traceId || 'unknown'}] Pass 2: Updating line item with SPONS data:`)
+    console.log(`  pass2_status: ${updateData.pass2_status}`)
+    console.log(`  pass2_confidence: ${updateData.pass2_confidence}`)
+    console.log(`  spons_candidate_code: ${updateData.spons_candidate_code}`)
+    console.log(`  spons_candidate_label: ${updateData.spons_candidate_label}`)
+    console.log(`  spons_candidates count: ${top5Candidates.length}`)
+  }
+
   await prisma.line_items.update({
     where: { id: lineItemId },
-    data: {
-      status: finalStatus,
-      col_b_type: normalised.type,
-      col_c_category: normalised.category,
-      col_g_description: normalised.description,
-      col_s_floor: normalised.floor,
-      col_t_location: normalised.location,
-      col_u_asset_condition: normalised.assetCondition,
-      col_y_observations: normalised.observations,
-      unit_conversion_logic: unitConversionLogic,
-    },
+    data: updateData,
   })
+
+  console.log(`[${traceId || 'unknown'}] LineItem updated with SPONS match`)
 
   // Create audit entry
   await prisma.audit_entries.create({

@@ -48,6 +48,12 @@ export async function GET(
       source_capture_id: item.source_capture_id,
     }))
 
+    // Log SPONS field presence for debugging
+    console.log(`[DEBUG] Items API: Returning ${items.length} items`)
+    transformedItems.forEach((item, index) => {
+      console.log(`[DEBUG] Item ${index + 1}: pass2_status=${item.pass2_status}, sponsCode=${item.sponsCode}, confidence=${item.pass2_confidence}`)
+    })
+
     return NextResponse.json({
       items: transformedItems,
     })
