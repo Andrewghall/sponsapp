@@ -99,36 +99,6 @@ export async function processPass2(lineItemId: string, traceId?: string): Promis
 
   const isValid = missingMandatory.length === 0
 
-  // Update line item
-  await prisma.line_items.update({
-    where: { id: lineItemId },
-    data: {
-      status: isValid ? 'PASS2_COMPLETE' : 'PENDING_PASS2',
-      col_b_type: normalised.type,
-      col_c_category: normalised.category,
-      col_g_description: normalised.description,
-      col_s_floor: normalised.floor,
-      col_t_location: normalised.location,
-      col_u_asset_condition: normalised.assetCondition,
-      col_y_observations: normalised.observations,
-      unit_conversion_logic: unitConversionLogic,
-    },
-  })
-
-  // Create audit entry
-  await prisma.audit_entries.create({
-    data: {
-      line_item_id: lineItemId,
-      action: 'PASS2_NORMALISED',
-      unit_conversion_logic: unitConversionLogic,
-      metadata: {
-        normalised,
-        missingMandatory,
-        isValid,
-      },
-    },
-  })
-
   // If valid, run retrieval-only SPONS candidate lookup
   let candidates: any[] = []
   if (isValid) {
@@ -161,7 +131,42 @@ export async function processPass2(lineItemId: string, traceId?: string): Promis
   let finalStatus: Pass2Result['status'] = 'UNMATCHED'
   if (candidates.length > 0) {
     finalStatus = 'PASS2_COMPLETE'
+    console.log(`[${traceId || 'unknown'}] Pass 2: Found ${candidates.length} candidates, status = PASS2_COMPLETE`)
+  } else {
+    console.log(`[${traceId || 'unknown'}] Pass 2: No candidates found, status = UNMATCHED`)
   }
+
+  // Update line item with final status
+  await prisma.line_items.update({
+    where: { id: lineItemId },
+    data: {
+      status: finalStatus,
+      col_b_type: normalised.type,
+      col_c_category: normalised.category,
+      col_g_description: normalised.description,
+      col_s_floor: normalised.floor,
+      col_t_location: normalised.location,
+      col_u_asset_condition: normalised.assetCondition,
+      col_y_observations: normalised.observations,
+      unit_conversion_logic: unitConversionLogic,
+    },
+  })
+
+  // Create audit entry
+  await prisma.audit_entries.create({
+    data: {
+      line_item_id: lineItemId,
+      action: 'PASS2_NORMALISED',
+      unit_conversion_logic: unitConversionLogic,
+      metadata: {
+        normalised,
+        missingMandatory,
+        isValid,
+        candidatesCount: candidates.length,
+        finalStatus,
+      },
+    },
+  })
   
   return {
     lineItemId,
