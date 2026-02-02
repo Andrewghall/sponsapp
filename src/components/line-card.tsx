@@ -83,11 +83,31 @@ export function LineCard({
     const res = await fetch('/api/spons/candidates/select', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lineItemId: id, sponsItemId, rationale: 'QS manual selection' }),
+      body: JSON.stringify({ lineItemId: id, sponsItemId }),
     })
     if (res.ok) {
-      setSelectedCandidateId(sponsItemId)
-      // Optionally refresh data or trigger parent re-fetch
+      window.location.reload() // Refresh to show updated status
+    }
+  }
+
+  const handleManualMatch = async (lineItemId: string) => {
+    try {
+      console.log('Triggering manual SPONS match for line item:', lineItemId)
+      const res = await fetch('/api/pass2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineItemId }),
+      })
+      
+      if (res.ok) {
+        console.log('Manual SPONS match triggered successfully')
+        // Refresh the page to show updated status
+        window.location.reload()
+      } else {
+        console.error('Failed to trigger manual SPONS match')
+      }
+    } catch (error) {
+      console.error('Error triggering manual SPONS match:', error)
     }
   }
 
@@ -170,6 +190,23 @@ export function LineCard({
             </div>
           )}
           
+          {/* Show pending status with manual trigger */}
+          {(status === 'PENDING_PASS1' || status === 'PENDING_PASS2') && (
+            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+              <div className="flex items-center gap-1 text-blue-700 font-medium">
+                <Clock size={12} />
+                Pending SPONS Match
+              </div>
+              <p className="text-blue-600 mt-1">Waiting for automatic matching</p>
+              <button
+                onClick={() => handleManualMatch(id)}
+                className="w-full mt-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded"
+              >
+                Trigger Manual Match
+              </button>
+            </div>
+          )}
+
           {/* Show QS Review status */}
           {pass2_status === 'QS_REVIEW' && (
             <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
