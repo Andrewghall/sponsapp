@@ -106,10 +106,10 @@ export default function ProjectPage() {
   }
 
   const handleZoneChange = async () => {
-    console.log('Zone change button clicked!')
+    console.log('[DEBUG] Zone change button clicked! isStoreReady:', isStoreReady, 'projectId:', projectId)
     if (isStoreReady) {
       try {
-        console.log('Creating zone for project:', projectId)
+        console.log('[DEBUG] Creating zone for project:', projectId)
         const response = await fetch(`/api/projects/${projectId}/zones`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -119,7 +119,8 @@ export default function ProjectPage() {
           })
         })
         
-        console.log('Zone creation response status:', response.status)
+        console.log('[DEBUG] Zone creation response status:', response.status)
+        console.log('[DEBUG] Zone creation response headers:', response.headers)
         
         if (!response.ok) {
           const error = await response.json().catch(() => ({}))

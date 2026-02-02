@@ -4,30 +4,37 @@ import { v4 as uuidv4 } from 'uuid'
 
 export const runtime = 'nodejs'
 
-// POST /api/projects/[id]/zones - Create a new zone
+// POST /api/projects/[id]/zones - Create new zone
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('[DEBUG] Zones POST API called')
+  
   try {
     const { id: projectId } = await params
+    const body = await request.json()
+    console.log('[DEBUG] Zone creation request:', { projectId, body })
     
     if (!projectId) {
+      console.log('[DEBUG] Missing project ID')
       return NextResponse.json(
         { error: 'Project ID is required' },
         { status: 400 }
       )
     }
 
-    const body = await request.json()
     const { name, description } = body
-
+    
     if (!name) {
+      console.log('[DEBUG] Missing zone name')
       return NextResponse.json(
         { error: 'Zone name is required' },
         { status: 400 }
       )
     }
+    
+    console.log('[DEBUG] Creating zone with data:', { projectId, name, description })
     
     const zone = await prisma.zones.create({
       data: {
