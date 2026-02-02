@@ -39,6 +39,8 @@ export async function POST(
       },
     })
 
+    console.log(`[DEBUG] Zone created: ${zone.id} for project ${projectId}, name="${name}"`)
+
     return NextResponse.json({
       zone,
       message: 'Zone created successfully'

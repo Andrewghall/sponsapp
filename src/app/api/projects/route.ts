@@ -15,6 +15,11 @@ export async function GET() {
       },
     })
 
+    // Debug logging for project counts
+    projects.forEach(project => {
+      console.log(`[DEBUG] Project ${project.id}: zones=${project._count?.zones || 0}, items=${project._count?.line_items || 0}`)
+    })
+
     return NextResponse.json(projects)
   } catch (error) {
     console.error('Failed to fetch projects:', error)

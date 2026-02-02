@@ -19,19 +19,28 @@ async function getProjects() {
     // Get stats for each project
     const projectsWithStats = await Promise.all(
       projects.map(async (project) => {
-        // Simplified stats - just get total line items count
-        const lineItemCount = await prisma.line_items.count({
-          where: { project_id: project.id }
+        // Get actual line item counts by status
+        const lineItems = await prisma.line_items.findMany({
+          where: { project_id: project.id },
+          select: { status: true }
         });
+
+        const stats = {
+          matched: lineItems.filter(item => item.status === 'PASS2_COMPLETE').length,
+          pending: lineItems.filter(item => 
+            item.status === 'PENDING_PASS1' || 
+            item.status === 'PENDING_PASS2' || 
+            item.status === 'PENDING_QS_REVIEW'
+          ).length,
+          failed: lineItems.filter(item => item.status && item.status.toString() === 'PASS2_ERROR').length,
+          lineItems: lineItems.length
+        };
+
+        console.log(`[DEBUG] Home page stats for ${project.id}: matched=${stats.matched}, pending=${stats.pending}, failed=${stats.failed}, total=${stats.lineItems}`);
 
         return {
           ...project,
-          _stats: { 
-            matched: 0, 
-            pending: 0, 
-            failed: 0,
-            lineItems: lineItemCount
-          }
+          _stats: stats
         };
       })
     );

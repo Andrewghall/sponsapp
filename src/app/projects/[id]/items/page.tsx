@@ -70,13 +70,13 @@ export default function ItemsPage() {
   const filteredItems = items.filter(item => {
     switch (filter) {
       case 'matched':
-        return item.pass2_status === 'MATCHED'
+        return item.status === 'PASS2_COMPLETE'
       case 'qs_review':
-        return item.pass2_status === 'QS_REVIEW'
+        return item.status === 'PENDING_QS_REVIEW'
       case 'pending':
-        return item.pass2_status === 'PENDING' || item.pass2_status === 'MATCHING'
+        return item.status === 'PENDING_PASS1' || item.status === 'PENDING_PASS2' || item.status === 'PENDING_QS_REVIEW'
       case 'failed':
-        return item.pass2_status === 'FAILED'
+        return item.status === 'PASS2_ERROR'
       default:
         return true
     }
@@ -105,10 +105,10 @@ export default function ItemsPage() {
 
   const filterCounts = {
     all: items.length,
-    matched: items.filter(item => item.pass2_status === 'MATCHED').length,
-    qs_review: items.filter(item => item.pass2_status === 'QS_REVIEW').length,
-    pending: items.filter(item => item.pass2_status === 'PENDING' || item.pass2_status === 'MATCHING').length,
-    failed: items.filter(item => item.pass2_status === 'FAILED').length,
+    matched: items.filter(item => item.status === 'PASS2_COMPLETE').length,
+    qs_review: items.filter(item => item.status === 'PENDING_QS_REVIEW').length,
+    pending: items.filter(item => item.status === 'PENDING_PASS1' || item.status === 'PENDING_PASS2' || item.status === 'PENDING_QS_REVIEW').length,
+    failed: items.filter(item => item.status === 'PASS2_ERROR').length,
   }
 
   return (
