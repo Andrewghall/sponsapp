@@ -1,3 +1,22 @@
+/**
+ * POST /api/agentic-assessment — Main orchestration endpoint for the AI pipeline.
+ *
+ * Receives a transcript (from a freshly transcribed capture) and drives it
+ * through the full processing flow:
+ *
+ *   1. **Planning** — Normalise the transcript text and detect multi-asset speech.
+ *   2. **Splitting** — GPT-4 splits the transcript into discrete observations.
+ *   3. **Pipeline** — Clean, deduplicate, and infer quantities for each observation.
+ *   4. **Line-item creation** — Persist one `line_items` row per observation.
+ *   5. **Agentic matching** — For each line item, run the full agentic loop
+ *      (clean → validate → retrieve SPONS candidates → LLM decide → persist).
+ *
+ * On partial failure individual observations are marked FAILED; the endpoint
+ * still returns 200 with a summary so the client can track progress.
+ *
+ * Every request is tagged with a `traceId` for end-to-end log correlation.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 

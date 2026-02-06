@@ -1,9 +1,20 @@
+/**
+ * /api/spons/candidates — SPONS candidate management for a line item.
+ *
+ * GET  ?lineItemId=xxx  — Returns the ranked candidate list (from spons_matches),
+ *       the LLM agent's decision/rationale, and the normalised line-item fields.
+ *       Used by the LineCard expanded view.
+ *
+ * POST — QS manual override: selects a specific SPONS candidate, clears previous
+ *       selections, advances the line item to APPROVED, and logs an audit entry.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 
-// GET /api/spons/candidates?lineItemId=xxx - Fetch candidates and agent decision for a line item
+/** Fetch candidates, agent decision, and normalised fields for a line item. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -82,7 +93,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/spons/candidates/select - QS selects/overrides a candidate
+/** QS selects or overrides a SPONS candidate for the given line item. */
 export async function POST(request: NextRequest) {
   try {
     const { lineItemId, sponsItemId, rationale } = await request.json()

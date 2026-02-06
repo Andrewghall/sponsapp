@@ -1,5 +1,17 @@
 'use client'
 
+/**
+ * Export page — generate LCY3-format Excel or CSV workbooks.
+ *
+ * The engineer selects a format (XLSX or CSV), an item filter (All, Matched
+ * Only, or High Confidence >=80%), and reviews a preview table before
+ * triggering the export. The generated file includes context columns, asset
+ * details, SPONS codes/descriptions, confidence scores, and quantities.
+ *
+ * The export request is sent to POST /api/export/excel which builds the
+ * workbook server-side with ExcelJS and returns a binary blob for download.
+ */
+
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'

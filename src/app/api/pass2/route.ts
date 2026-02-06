@@ -1,3 +1,15 @@
+/**
+ * POST /api/pass2 — Trigger Pass 2 normalisation for a single line item.
+ *
+ * Accepts { lineItemId } and runs the full Pass 2 pipeline (synonym resolution,
+ * SPONS retrieval, agentic selection). Used both by the automatic pipeline and
+ * by the "Trigger Manual Match" button in the UI.
+ *
+ * The endpoint is designed to never throw — on Pass 2 failure it records the
+ * error in audit_entries and returns `{ success: true, result.status: 'PASS2_ERROR' }`
+ * so the caller can distinguish API errors from processing errors.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
@@ -5,7 +17,6 @@ export const runtime = 'nodejs'
 import { processPass2 } from '@/lib/processing/pass2'
 import { v4 as uuidv4 } from 'uuid'
 
-// POST /api/pass2 - Async Pass 2 processing (non-blocking)
 export async function POST(request: NextRequest) {
   const traceId = uuidv4()
   console.log(`[${traceId}] Pass 2 API called`)

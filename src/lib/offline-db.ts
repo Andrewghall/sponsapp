@@ -1,3 +1,20 @@
+/**
+ * Offline Database — IndexedDB abstraction for offline-first capture storage.
+ *
+ * All voice captures are first saved locally in IndexedDB so the app works
+ * without network connectivity. Two object stores are used:
+ *
+ *   - **captures** — Audio blobs + metadata, indexed by project, sync status,
+ *     and timestamp. Each capture progresses through the sync lifecycle:
+ *     PENDING → UPLOADING → TRANSCRIBING → SPLITTING → MATCHING → COMPLETE.
+ *
+ *   - **pendingSync** — Generic sync queue for any data that needs to be
+ *     pushed to the server when connectivity resumes.
+ *
+ * Completed captures older than 7 days are automatically cleaned up by
+ * `cleanupOldCaptures()` to prevent IndexedDB from growing unbounded.
+ */
+
 import { openDB, IDBPDatabase } from 'idb'
 
 interface CaptureContext {

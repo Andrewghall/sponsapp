@@ -1,5 +1,20 @@
 'use client'
 
+/**
+ * LineCard — Expandable card component for displaying a single line item.
+ *
+ * Shows the item's processing status (pending → matched → approved → exported),
+ * transcript, location info, and — when expanded — the SPONS candidate list
+ * with agent decision rationale. A QS (Quantity Surveyor) can manually select
+ * a candidate from the expanded view when the item is in review status.
+ *
+ * Data flow:
+ *   1. Collapsed view renders from props (status, description, pass2 info).
+ *   2. On expand, fetches SPONS candidates + agent decision from
+ *      /api/spons/candidates for items in PENDING_QS_REVIEW or APPROVED states.
+ *   3. QS selection POSTs to /api/spons/candidates/select, then reloads.
+ */
+
 import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, User, Bot } from 'lucide-react'
 
@@ -64,6 +79,7 @@ export function LineCard({
   const [loading, setLoading] = useState(false)
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
 
+  // Fetch SPONS candidates on expand for items awaiting or past QS review.
   useEffect(() => {
     if (expanded && (status === 'PENDING_QS_REVIEW' || status === 'APPROVED')) {
       setLoading(true)
@@ -79,6 +95,7 @@ export function LineCard({
     }
   }, [expanded, id, status])
 
+  /** Confirm a QS's manual candidate selection and reload to reflect the change. */
   const handleQSSelect = async (sponsItemId: string) => {
     const res = await fetch('/api/spons/candidates/select', {
       method: 'POST',
@@ -90,6 +107,7 @@ export function LineCard({
     }
   }
 
+  /** Re-trigger the Pass 2 pipeline for items stuck in a pending state. */
   const handleManualMatch = async (lineItemId: string) => {
     try {
       console.log('Triggering manual SPONS match for line item:', lineItemId)
@@ -111,6 +129,7 @@ export function LineCard({
     }
   }
 
+  /** Map each processing status to its display icon, colour, and label. */
   const statusConfig: Record<string, { icon: any; color: string; label: string }> = {
     PENDING_PASS1: { icon: Clock, color: 'text-gray-500', label: 'Pending' },
     PASS1_COMPLETE: { icon: Clock, color: 'text-blue-500', label: 'Transcribed' },
@@ -124,6 +143,7 @@ export function LineCard({
     EXPORTED: { icon: CheckCircle, color: 'text-green-600', label: 'Exported' },
   }
 
+  /** Pass 2 sub-status indicators (SPONS matching progress). */
   const pass2StatusConfig: Record<string, { color: string; label: string }> = {
     PENDING: { color: 'text-gray-500', label: 'Pending' },
     PLANNING: { color: 'text-blue-500', label: 'Planning' },

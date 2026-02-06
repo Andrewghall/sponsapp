@@ -1,9 +1,16 @@
+/**
+ * GET /api/pass2/[lineItemId] — Retrieve Pass 2 processing status.
+ *
+ * Returns the current status, any error message from the most recent
+ * PASS2_ERROR audit entry, and the ranked list of SPONS match candidates.
+ * Used by the UI to poll processing progress after triggering Pass 2.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 
-// GET /api/pass2/[lineItemId] - Get Pass 2 status
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ lineItemId: string }> }

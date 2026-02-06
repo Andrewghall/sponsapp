@@ -1,9 +1,21 @@
+/**
+ * /api/spons/search — SPONS database search (retrieval-only, never generates).
+ *
+ * GET  — Text-based search by description, tags, or item code with optional
+ *         trade and unit filters.  Suitable for manual QS lookups.
+ *
+ * POST — Vector similarity search.  Accepts a pre-computed embedding and
+ *         returns the closest SPONS items using pgvector's cosine distance
+ *         operator (<=>).  Trade and unit filters are applied BEFORE ranking
+ *         to reduce the search space.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 
-// GET /api/spons/search - Search SPONS items (retrieval only, no generation)
+/** Text search — filters by description/tags/item_code with optional trade/unit. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -60,7 +72,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/spons/search - Vector similarity search
+/** Vector similarity search — accepts an embedding array, returns nearest items. */
 export async function POST(request: NextRequest) {
   try {
     const { embedding, trade, unit, limit = 10 } = await request.json()

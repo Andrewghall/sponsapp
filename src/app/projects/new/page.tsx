@@ -1,5 +1,13 @@
 'use client'
 
+/**
+ * New Project page — form for creating a survey project.
+ *
+ * Fields: Project Name (required), Your Name (required), Client, Site Address.
+ * On submit, POSTs to /api/projects and redirects to the new project's overview.
+ * Handles 503 (database connection limit) with auto-retry messaging.
+ */
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'

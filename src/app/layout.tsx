@@ -1,3 +1,8 @@
+/**
+ * Root layout — wraps every page with global styles, PWA metadata, and the
+ * ConnectionStatusBar that shows online/offline/syncing state at the top.
+ */
+
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ConnectionStatusBar } from "@/components/connection-status";

@@ -1,14 +1,31 @@
 'use client'
 
+/**
+ * ContextSelector — Modal form for setting the capture area context.
+ *
+ * Before recording an observation, the engineer selects which zone, level,
+ * and room they are in. This component provides:
+ *   - Three text inputs (Zone, Level/Floor, Room/Area) with voice-input buttons
+ *   - A "Recent Areas" list (up to 5) for quick re-selection
+ *   - Clear / Done actions
+ *
+ * The selected CaptureContext is passed up via `onChange` and persisted by
+ * the parent through ContextManager.
+ */
+
 import { useState } from 'react'
 import { Mic, X, Clock } from 'lucide-react'
 import { CaptureContext, formatContext } from '@/lib/context/ContextManager'
 import { cn } from '@/lib/utils'
 
 interface ContextSelectorProps {
+  /** Current zone/level/room values. */
   context: CaptureContext
+  /** Called whenever any context field changes. */
   onChange: (context: CaptureContext) => void
+  /** Previously used contexts for quick selection. */
   recentContexts: CaptureContext[]
+  /** Close the selector panel. */
   onClose: () => void
 }
 

@@ -1,5 +1,15 @@
-// Pass 1: Capture - Extract raw entities only
-// NO inference, NO pricing, NO SPONS matching
+/**
+ * Pass 1 — Raw Entity Extraction
+ *
+ * The first stage of the two-pass processing pipeline. Scans the transcript
+ * for explicit quantities (e.g. "2 doors", "ten metres") and known equipment
+ * terms (e.g. "fire door", "cable tray") using regex patterns and a keyword
+ * vocabulary. NO inference, NO pricing, NO SPONS matching — only what was
+ * literally spoken is captured here.
+ *
+ * Outputs are stored on the `captures` row (raw_quantities, raw_components)
+ * and the parent `line_items` status advances to PASS1_COMPLETE.
+ */
 
 import { prisma } from '@/lib/prisma'
 
@@ -65,7 +75,12 @@ export async function processPass1(captureId: string): Promise<Pass1Result> {
   }
 }
 
-// Extract raw quantities - NO inference
+/**
+ * Extract raw quantities mentioned in the transcript.
+ * Matches numeric digits ("2 doors") and number words ("two doors") followed
+ * by recognised unit keywords. Units are normalised to SPONS-compatible codes
+ * (nr, m, lm, m2). No inference — only explicit mentions are extracted.
+ */
 function extractQuantities(transcript: string): { value: number; unit: string }[] {
   const quantities: { value: number; unit: string }[] = []
   const lowerTranscript = transcript.toLowerCase()
@@ -102,7 +117,7 @@ function extractQuantities(transcript: string): { value: number; unit: string }[
   return quantities
 }
 
-// Normalize unit strings
+/** Map spoken/abbreviated unit strings to canonical SPONS unit codes. */
 function normalizeUnit(unit: string): string {
   const unitMap: Record<string, string> = {
     door: 'nr', doors: 'nr',
@@ -119,7 +134,11 @@ function normalizeUnit(unit: string): string {
   return unitMap[unit.toLowerCase()] || unit.toLowerCase()
 }
 
-// Extract raw components - NO inference
+/**
+ * Detect equipment/building-element terms present in the transcript.
+ * Terms are checked from most-specific to least-specific so that e.g.
+ * "fire door" is recorded instead of the generic "door".
+ */
 function extractComponents(transcript: string): string[] {
   const components: string[] = []
   const lowerTranscript = transcript.toLowerCase()

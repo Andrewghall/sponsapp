@@ -1,5 +1,17 @@
 'use client'
 
+/**
+ * Record page — alternative recording interface with live transcript display.
+ *
+ * Shows the real-time transcript from Deepgram as the user speaks, a large
+ * RecordButton, and a feed of recently captured items rendered as LineCards.
+ * After Pass 2 completes the user is automatically redirected back to the
+ * home dashboard.
+ *
+ * Uses the legacy RecordButton from /components/record-button.tsx which
+ * handles the full capture → transcribe → assessment flow inline.
+ */
+
 import { useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, List } from 'lucide-react'

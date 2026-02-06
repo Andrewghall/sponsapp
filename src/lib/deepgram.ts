@@ -1,3 +1,14 @@
+/**
+ * Deepgram API wrapper — server-side speech-to-text transcription.
+ *
+ * Uses Deepgram's Nova-2 model with en-GB locale for UK warehouse inspections.
+ * `transcribeAudio()` performs batch (pre-recorded) transcription — the audio
+ * buffer is sent in one request and the full transcript is returned.
+ *
+ * For real-time (streaming) transcription the `LiveTranscriptionEvents` enum
+ * is re-exported for use by WebSocket-based streaming consumers.
+ */
+
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk'
 
 export interface TranscriptionResult {

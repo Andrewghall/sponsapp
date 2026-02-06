@@ -1,10 +1,23 @@
+/**
+ * Home / Dashboard page (Server Component).
+ *
+ * Displays all projects with per-project statistics (matched, pending, failed
+ * line items) and aggregate totals. Also provides a "New Project" button and
+ * a welcome banner explaining the Record → Process → Export workflow.
+ *
+ * Data is fetched server-side via Prisma; on DB failure the page still renders
+ * with an empty project list and an offline-friendly fallback message.
+ */
+
 import Link from "next/link";
 import { FolderOpen, Plus, ChevronRight, BarChart3, CheckCircle, AlertCircle, Clock, Search } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { DeleteProjectButton } from "@/components/DeleteProjectButton";
 
+/** Force dynamic rendering — project stats must always be fresh. */
 export const dynamic = 'force-dynamic';
 
+/** Fetch all projects with line-item counts broken down by processing status. */
 async function getProjects() {
   try {
     const projects = await prisma.projects.findMany({
@@ -53,9 +66,13 @@ async function getProjects() {
   }
 }
 
+/**
+ * Server-side cascade delete — removes a project and all related data.
+ * Deletion order matters due to foreign-key constraints:
+ *   audit_entries → spons_matches → line_items → zones → project.
+ */
 async function deleteProject(projectId: string) {
   try {
-    // First, delete all related data in the correct order
     await prisma.audit_entries.deleteMany({
       where: {
         line_items: {

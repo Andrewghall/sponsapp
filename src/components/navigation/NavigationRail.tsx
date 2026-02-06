@@ -1,5 +1,15 @@
 'use client'
 
+/**
+ * NavigationRail — Desktop sidebar navigation for project-level pages.
+ *
+ * Renders a fixed-width side panel (264 px) with the same four project
+ * sections as BottomTabs: Capture, Items, Sync, and Export.
+ * Includes a header showing the truncated project ID and a footer.
+ *
+ * Used on wider screens; the mobile equivalent is BottomTabs.
+ */
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Mic, List, RefreshCw, CheckSquare } from 'lucide-react'
@@ -10,6 +20,7 @@ interface NavigationRailProps {
   className?: string
 }
 
+/** Tab definitions — shared structure with BottomTabs for consistency. */
 const navigationItems = [
   {
     href: (projectId: string) => `/projects/${projectId}/capture`,

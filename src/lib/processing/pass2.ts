@@ -1,9 +1,19 @@
-// Pass 2: Agentic Normalisation
-// - Synonym resolution
-// - Unit conversion
-// - Taxonomy mapping
-// - Mandatory field validation
-// - Retrieval-only SPONS candidate lookup
+/**
+ * Pass 2 — Agentic Normalisation & SPONS Matching
+ *
+ * The second (and heavier) stage of the processing pipeline. Takes the raw
+ * entities from Pass 1 and:
+ *   1. Resolves synonyms to canonical types/categories (e.g. "ahu" → "AHU").
+ *   2. Extracts location and floor from the transcript via regex patterns.
+ *   3. Classifies asset condition as LOW / MEDIUM / HIGH.
+ *   4. Validates that all mandatory LCY3 fields are present.
+ *   5. If valid, runs retrieval-only SPONS candidate lookup (pgvector search).
+ *   6. Triggers agentic selection (LLM picks the best candidate).
+ *   7. Writes final status + SPONS data back to the line_items row.
+ *   8. Creates an audit entry for the full normalisation trace.
+ *
+ * Final status is one of: PASS2_COMPLETE | UNMATCHED | PENDING_QS_REVIEW | APPROVED.
+ */
 
 import { prisma } from '@/lib/prisma'
 import { retrieveCandidates } from './retrieval'
@@ -26,7 +36,7 @@ export interface Pass2Result {
   candidates?: any[]
 }
 
-// Mandatory fields for pricing-safe completion
+/** LCY3 column references that must be populated for export-ready items. */
 const MANDATORY_FIELDS = [
   'colB_type',
   'colC_category',
@@ -223,7 +233,7 @@ export async function processPass2(lineItemId: string, traceId?: string): Promis
   }
 }
 
-// Synonym resolution for Type
+/** Map raw component names to canonical asset types (e.g. "ahu" → "AHU"). */
 function resolveType(components: string[]): string | undefined {
   const typeMap: Record<string, string> = {
     'fire door': 'Door',
@@ -256,7 +266,7 @@ function resolveType(components: string[]): string | undefined {
   return undefined
 }
 
-// Synonym resolution for Category
+/** Map raw component names to trade categories (e.g. "cable tray" → "Electrical"). */
 function resolveCategory(components: string[]): string | undefined {
   const categoryMap: Record<string, string> = {
     'fire door': 'Doors & Ironmongery',
@@ -286,7 +296,10 @@ function resolveCategory(components: string[]): string | undefined {
   return undefined
 }
 
-// Extract location info from transcript
+/**
+ * Extract floor and location from the transcript using regex heuristics.
+ * Looks for patterns like "floor 2", "ground floor", "in the server room".
+ */
 function extractLocationInfo(transcript: string): { floor?: string; location?: string } {
   const lower = transcript.toLowerCase()
   
@@ -326,7 +339,7 @@ function extractLocationInfo(transcript: string): { floor?: string; location?: s
   return { floor, location }
 }
 
-// Normalize floor strings
+/** Convert floor abbreviations and ordinals to human-readable labels. */
 function normalizeFloor(floor: string): string {
   const floorMap: Record<string, string> = {
     'ground': 'Ground Floor',
@@ -358,7 +371,10 @@ function normalizeFloor(floor: string): string {
   return floor
 }
 
-// Extract condition from transcript
+/**
+ * Classify asset condition based on keywords in the transcript.
+ * HIGH = damaged/urgent/critical, LOW = good/new, MEDIUM = fair/moderate.
+ */
 function extractCondition(transcript: string): 'LOW' | 'MEDIUM' | 'HIGH' | undefined {
   const lower = transcript.toLowerCase()
   
@@ -384,7 +400,7 @@ function extractCondition(transcript: string): 'LOW' | 'MEDIUM' | 'HIGH' | undef
   return undefined
 }
 
-// Build description from components and quantities
+/** Compose a short description like "2 x Fire Door" from extracted data. */
 function buildDescription(
   components: string[],
   quantities: { value: number; unit: string }[]

@@ -1,9 +1,24 @@
+/**
+ * Observation Splitter — GPT-4 powered transcript segmentation.
+ *
+ * A single voice recording often mentions several distinct assets or issues
+ * (e.g. "two fire doors need replacing and the AHU filter is blocked").
+ * This module sends the raw transcript to GPT-4 with a structured JSON
+ * schema and receives back an array of discrete observations, each tagged
+ * with asset type, trade, location, technical attributes, and confidence.
+ *
+ * On failure (API error, invalid JSON) it falls back to treating the entire
+ * transcript as a single low-confidence observation so that processing can
+ * continue without data loss.
+ */
+
 import OpenAI from 'openai'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+/** A single discrete observation extracted from a transcript by GPT-4. */
 interface Observation {
   asset_type: string
   issue: string
@@ -24,6 +39,10 @@ interface ObservationResponse {
   observations: Observation[]
 }
 
+/**
+ * Send the transcript to GPT-4 and receive structured observations.
+ * Temperature is kept at 0.1 for deterministic, repeatable splits.
+ */
 export async function splitTranscriptIntoObservations(transcript: string): Promise<Observation[]> {
   const prompt = `You are a building inspection expert. Split this transcript into discrete observations.
   

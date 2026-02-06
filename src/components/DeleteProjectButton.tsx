@@ -1,5 +1,14 @@
 'use client'
 
+/**
+ * DeleteProjectButton — Inline delete button with confirmation prompt.
+ *
+ * Renders a small trash icon button. On click, shows a browser `confirm()`
+ * dialog warning that all project data (captures, line items, audit entries)
+ * will be cascade-deleted. Calls DELETE /api/projects/[id]/delete and
+ * reloads the page on success.
+ */
+
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 

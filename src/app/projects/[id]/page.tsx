@@ -1,5 +1,19 @@
 'use client'
 
+/**
+ * Project Overview page — hub for a single project.
+ *
+ * Displays:
+ *   - Current zone selector with full zone CRUD management
+ *   - Quick-action buttons (Record Item, View Items)
+ *   - Progress stats (captured / pending / approved)
+ *   - Recent items feed with status indicators
+ *   - Export link for LCY3 Excel generation
+ *
+ * Refreshes data automatically when the browser tab regains focus
+ * (useful after completing a recording on a mobile device).
+ */
+
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'

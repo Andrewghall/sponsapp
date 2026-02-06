@@ -1,6 +1,24 @@
+/**
+ * SyncManager — Orchestrates offline-to-online synchronisation.
+ *
+ * Monitors network connectivity and, when online, processes pending captures
+ * through the full pipeline:
+ *   1. Upload audio blob to the server.
+ *   2. Transcribe via Deepgram.
+ *   3. Split transcript into observations and create line items.
+ *   4. Run agentic SPONS matching.
+ *
+ * Uses a simple mutex (`isProcessing`) to prevent concurrent sync runs.
+ * Connection is polled every 30 seconds and also reacts to the browser's
+ * `online` event for immediate sync when connectivity returns.
+ *
+ * A global singleton is exposed via `getSyncManager()`.
+ */
+
 import { OfflineCapture, SyncStatus, updateCaptureSyncStatus, getOfflineCapture } from '@/lib/offline-db'
 
 export class SyncManager {
+  /** Simple mutex — prevents overlapping sync runs. */
   private isProcessing = false
   private connectionMonitorInterval: NodeJS.Timeout | null = null
 

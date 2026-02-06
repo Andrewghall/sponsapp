@@ -1,5 +1,15 @@
 'use client'
 
+/**
+ * BottomTabs — Mobile bottom navigation bar for project-level pages.
+ *
+ * Renders a fixed-position tab bar at the bottom of the viewport with links
+ * to the four main project sections: Capture, Items, Sync, and Export.
+ * Active tab is highlighted based on the current URL pathname.
+ *
+ * Used on small screens; the desktop equivalent is NavigationRail.
+ */
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Mic, List, RefreshCw, CheckSquare } from 'lucide-react'
@@ -10,6 +20,7 @@ interface BottomTabsProps {
   className?: string
 }
 
+/** Tab definitions — each entry maps a label + icon to a project sub-route. */
 const navigationItems = [
   {
     href: (projectId: string) => `/projects/${projectId}/capture`,

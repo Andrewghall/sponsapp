@@ -1,5 +1,18 @@
 'use client'
 
+/**
+ * Capture page — the primary recording interface for field engineers.
+ *
+ * Layout:
+ *   - Sticky header with project name, area context, and online/offline status
+ *   - Collapsible ContextSelector for setting zone/level/room
+ *   - Central RecordButton (large tap target) for starting voice capture
+ *   - Footer with links to Sync Status and Items views
+ *
+ * Monitors network connectivity in real-time and displays the count of
+ * locally-queued captures waiting to sync.
+ */
+
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'

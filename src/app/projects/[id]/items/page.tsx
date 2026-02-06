@@ -1,5 +1,16 @@
 'use client'
 
+/**
+ * Items page — filterable list of all line items within a project.
+ *
+ * Provides a toolbar of filter buttons (All, Matched, QS Review, Pending,
+ * Failed) with real-time counts. Items are sorted newest-first and each
+ * row shows the asset type, observation text, context (zone/level/room),
+ * SPONS match, and confidence score.
+ *
+ * A fixed footer bar offers quick links to Record New and View Sync.
+ */
+
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'

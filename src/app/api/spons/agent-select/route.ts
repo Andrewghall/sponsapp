@@ -1,10 +1,24 @@
+/**
+ * POST /api/spons/agent-select — LLM-powered SPONS candidate selection.
+ *
+ * After Pass 2 retrieval populates spons_matches, this endpoint asks the LLM
+ * agent to review the candidates against the normalised line-item fields and
+ * the original transcript.  The agent can:
+ *
+ *   - **SELECT** a candidate → marks it is_selected, status → APPROVED.
+ *   - **FLAG_FOR_REVIEW** → status → PENDING_QS_REVIEW (low confidence).
+ *   - **ASK_CLARIFICATION** → status → PENDING_QS_REVIEW with a question
+ *     stored in the audit entry metadata.
+ *
+ * All decisions are persisted as audit_entries for the full audit trail.
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 import { runAgentSelection } from '@/lib/processing/agent'
 
-// POST /api/spons/agent-select - Run agentic LLM selection on retrieved candidates
 export async function POST(request: NextRequest) {
   try {
     const { lineItemId } = await request.json()

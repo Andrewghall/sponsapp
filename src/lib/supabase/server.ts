@@ -1,3 +1,14 @@
+/**
+ * Server-side Supabase client.
+ *
+ * Creates a Supabase client that can read/write cookies in Server Components,
+ * Server Actions, and Route Handlers. The cookie adapter is required so that
+ * Supabase can persist and refresh the user session across SSR requests.
+ *
+ * The setAll catch block silently swallows errors that occur when this client
+ * is used inside a Server Component (where cookies are read-only).
+ */
+
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -18,7 +29,7 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // Server Component - ignore
+            // Server Component context — cookies are read-only, safe to ignore.
           }
         },
       },

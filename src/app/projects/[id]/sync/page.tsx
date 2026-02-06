@@ -1,5 +1,17 @@
 'use client'
 
+/**
+ * Sync Status page — shows the offline-to-online synchronisation progress
+ * for all captures within a project.
+ *
+ * Captures are grouped by date and each row displays the area context,
+ * timestamp, current sync status (Pending → Uploading → Transcribing →
+ * Splitting → Matching → Complete / Failed), audio duration, and any
+ * error messages. Failed captures can be retried individually.
+ *
+ * A detail modal shows full metadata (audio size, retry count, transcript).
+ */
+
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -13,6 +25,7 @@ interface SyncItem extends OfflineCapture {
   formattedTime: string
 }
 
+/** Map each sync lifecycle stage to its display icon, colour, and label. */
 const statusConfig: Record<SyncStatus, { icon: any; color: string; label: string }> = {
   PENDING: { icon: Clock, color: 'text-gray-500', label: 'Pending' },
   UPLOADING: { icon: Upload, color: 'text-blue-500', label: 'Uploading' },
